@@ -1,14 +1,14 @@
 {
   "name": "agent-skills",
   "version": "1.0.0",
-  "description": "",
+  "description": "Agent Skills",
   "scripts": {
     "format": "prettier --write . --ignore-unknown",
     "prepare": "husky"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Saad Bash",
+  "license": "MIT",
   "packageManager": "pnpm@10.28.0",
   "devDependencies": {
     "husky": "^9.1.7",
