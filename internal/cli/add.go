@@ -78,7 +78,7 @@ func newAddCommand() *Command {
 				if err != nil {
 					return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
 				}
-				selected, missing = skills.Filter(allSkills, opts.skills.values)
+				selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
 				if len(missing) > 0 {
 					return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
 				}
@@ -106,7 +106,7 @@ func newAddCommand() *Command {
 					if err != nil {
 						return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
 					}
-					selected, missing = skills.Filter(allSkills, opts.skills.values)
+					selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
 					if len(missing) > 0 {
 						return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
 					}
@@ -235,6 +235,32 @@ func skillNames(items []skills.Skill) []string {
 		names = append(names, item.Name)
 	}
 	return names
+}
+
+func chooseSkills(all []skills.Skill, requested []string, yes bool) ([]skills.Skill, []string) {
+	if len(requested) > 0 {
+		return skills.Filter(all, requested)
+	}
+	if yes {
+		return all, nil
+	}
+	options := []string{"[all]"}
+	for _, item := range all {
+		options = append(options, item.Name)
+	}
+	selection, err := prompts.AskMulti("Select skills to install", options)
+	if err != nil {
+		return nil, []string{err.Error()}
+	}
+	if len(selection) == 0 {
+		return nil, nil
+	}
+	for _, pick := range selection {
+		if pick == "[all]" {
+			return all, nil
+		}
+	}
+	return skills.Filter(all, selection)
 }
 
 // multiString is a repeatable flag for --skill.

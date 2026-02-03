@@ -18,7 +18,7 @@ func TestAddListRemoveLocalRepo(t *testing.T) {
 
 	destDir := t.TempDir()
 
-	out := runSkillctl(t, "add", repoDir, "--dest", destDir, "--skill", "de-dupe", "--overwrite")
+	out := runSkillctl(t, "add", repoDir, "--dest", destDir, "--skill", "de-dupe", "--overwrite", "--yes")
 	if !strings.Contains(out, "Installed de-dupe") {
 		t.Fatalf("expected install output, got: %s", out)
 	}
@@ -48,7 +48,7 @@ func TestDryRunDoesNotCreateDest(t *testing.T) {
 	destBase := t.TempDir()
 	destDir := filepath.Join(destBase, "dest")
 
-	out := runSkillctl(t, "add", repoDir, "--dest", destDir, "--skill", "de-dupe", "--dry-run")
+	out := runSkillctl(t, "add", repoDir, "--dest", destDir, "--skill", "de-dupe", "--dry-run", "--yes")
 	if !strings.Contains(out, "Dry run") {
 		t.Fatalf("expected dry-run output, got: %s", out)
 	}
