@@ -2,26 +2,39 @@
 
 Collection of Agent Skills for various tasks.
 
-> If you asked your agent to perform a same task twice, it should probably be a skill.
+> If you asked your agent to perform the same task twice, it should probably be a skill.
 
-## Install using skills.sh
+## Install (Homebrew)
 
 ```sh
-npx skills add saadjs/agent-skills
+brew tap saadjs/tap
+brew install skillctl
+```
+
+## Install (manual)
+
+Download the latest release for your platform from GitHub Releases, then:
+
+```sh
+tar -xzf skillctl_<version>_<os>_<arch>.tar.gz
+sudo mv skillctl /usr/local/bin/skillctl
+```
+
+## Usage
+
+```sh
+skillctl add saadjs/agent-skills --tool codex --scope global
+skillctl add ./path/to/skills-repo --dest /tmp/skills
+skillctl list --tool cursor --scope project
+skillctl remove --tool copilot --scope project --skill de-dupe
 ```
 
 ## Structure
 
 - `skills/<skill-name>/SKILL.md` defines a skill, its triggers, and workflow.
 
-## Setup
+## Setup (dev)
 
 ```sh
-pnpm install
-```
-
-## Scripts
-
-```sh
-pnpm format
+go build ./cmd/skillctl
 ```
