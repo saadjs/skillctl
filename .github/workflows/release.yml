@@ -34,9 +34,11 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p dist
-          go build -o dist/skillctl ./cmd/skillctl
+          VERSION_CLEAN=${VERSION#v}
+          go build -ldflags "-X github.com/saadjs/agent-skills/internal/cli.Version=${VERSION_CLEAN}" -o dist/skillctl ./cmd/skillctl
 
       - name: Package
         env:
@@ -52,7 +54,7 @@ jobs:
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "*.tar.gz,*.tar.gz.sha256"
+          artifacts: '*.tar.gz,*.tar.gz.sha256'
           allowUpdates: true
           replacesArtifacts: true
           makeLatest: true

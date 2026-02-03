@@ -24,6 +24,13 @@ func Execute(args []string) {
 		newListCommand(),
 		newRemoveCommand(),
 	}
+	if len(args) > 0 {
+		switch args[0] {
+		case "-v", "--version", "-V":
+			fmt.Fprintln(os.Stdout, Version)
+			return
+		}
+	}
 	if len(args) == 0 {
 		printUsage(commands)
 		os.Exit(1)

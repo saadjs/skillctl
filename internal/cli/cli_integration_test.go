@@ -77,6 +77,13 @@ func TestDryRunDoesNotCreateDest(t *testing.T) {
 	}
 }
 
+func TestVersionFlag(t *testing.T) {
+	out := runSkillctl(t, "--version")
+	if strings.TrimSpace(out) != "dev" {
+		t.Fatalf("expected dev version, got: %s", out)
+	}
+}
+
 func TestAddLocalRepoPromptSelectSubset(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")
