@@ -50,8 +50,9 @@ jobs:
           shasum -a 256 "$TAR_NAME" | tee "$TAR_NAME.sha256"
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
-          files: |
-            *.tar.gz
-            *.tar.gz.sha256
+          artifacts: "*.tar.gz,*.tar.gz.sha256"
+          allowUpdates: true
+          replacesArtifacts: true
+          makeLatest: true
