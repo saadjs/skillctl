@@ -72,7 +72,7 @@ func Resolve(tool Tool, scope Scope, cwd string) (string, error) {
 		if scope == ScopeGlobal {
 			path = "~/.cursor/skills"
 		} else {
-			path = "./cursor/skills"
+			path = "./.cursor/skills"
 		}
 	case ToolWindsurf:
 		if scope == ScopeGlobal {
