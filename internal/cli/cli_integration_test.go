@@ -39,6 +39,26 @@ func TestAddListRemoveLocalRepo(t *testing.T) {
 	}
 }
 
+func TestAddLocalRepoYesInstallsAll(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+	mustWrite(t, filepath.Join(skillsDir, "beta", "SKILL.md"), "# beta\n")
+
+	destDir := t.TempDir()
+
+	out := runSkillctl(t, "add", repoDir, "--dest", destDir, "--yes")
+	if !strings.Contains(out, "Installing 2 skill(s)") {
+		t.Fatalf("expected install output, got: %s", out)
+	}
+
+	out = runSkillctl(t, "list", "--dest", destDir)
+	if !strings.Contains(out, "alpha") || !strings.Contains(out, "beta") {
+		t.Fatalf("expected alpha and beta, got: %s", out)
+	}
+}
+
 func TestDryRunDoesNotCreateDest(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")
