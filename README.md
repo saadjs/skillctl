@@ -7,7 +7,7 @@ Collection of Agent Skills for various tasks.
 ## Install (Homebrew)
 
 ```sh
-brew tap saadjs/tap
+brew tap saadjs/homebrew-tap
 brew install skillctl
 ```
 
