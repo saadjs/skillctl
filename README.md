@@ -24,6 +24,9 @@ sudo mv skillctl /usr/local/bin/skillctl
 
 ```sh
 skillctl add saadjs/agent-skills --tool codex --scope global
+skillctl add saadjs/agent-skills --tool codex --scope project
+skillctl add saadjs/agent-skills --tool cursor --scope project
+skillctl add saadjs/agent-skills --tool claude --scope project
 skillctl add ./path/to/skills-repo --dest /tmp/skills
 skillctl list --tool cursor --scope project
 skillctl remove --tool copilot --scope project --skill de-dupe
