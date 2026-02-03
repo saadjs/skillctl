@@ -41,10 +41,10 @@ func newAddCommand() *Command {
 	fs.BoolVar(&opts.yes, "yes", false, "Non-interactive mode")
 	fs.BoolVar(&opts.dryRun, "dry-run", false, "Print actions without changes")
 
-		cmd := &Command{
-			Name:        "add",
-			Short:       "Install skills from a GitHub repo or local path",
-			Usage:       "skillctl add <repo|path>",
+	cmd := &Command{
+		Name:        "add",
+		Short:       "Install skills from a GitHub repo or local path",
+		Usage:       "skillctl add <repo|path>",
 		FlagSet:     fs,
 		AllowNoArgs: false,
 		Run: func(args []string) error {
@@ -58,40 +58,100 @@ func newAddCommand() *Command {
 			if err != nil {
 				return err
 			}
-			if err := utils.EnsureDir(dest); err != nil {
-				return err
-			}
+
 			source := args[0]
 			repoPath, isLocal, err := utils.ResolveLocalPath(source)
 			if err != nil {
 				return err
 			}
+
+			var selected []skills.Skill
+			var selectedNames []string
+			var missing []string
+
 			if isLocal {
 				if opts.ref != "" {
 					return errors.New("--ref is not supported for local paths")
 				}
+				skillsDir := filepath.Join(repoPath, opts.path)
+				allSkills, err := skills.Discover(skillsDir)
+				if err != nil {
+					return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
+				}
+				selected, missing = skills.Filter(allSkills, opts.skills.values)
+				if len(missing) > 0 {
+					return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
+				}
+				if len(selected) == 0 {
+					return fmt.Errorf("no skills found in %s", skillsDir)
+				}
+				selectedNames = skillNames(selected)
 			} else {
 				repo, err := utils.NormalizeRepo(source)
 				if err != nil {
 					return err
 				}
-				repoURL := utils.RepoURL(repo)
-				repoPath, err = git.Clone(repoURL, opts.ref)
-				if err != nil {
-					return err
+				if opts.dryRun {
+					if len(opts.skills.values) > 0 {
+						selectedNames = opts.skills.values
+					}
+				} else {
+					repoURL := utils.RepoURL(repo)
+					repoPath, err = git.Clone(repoURL, opts.ref)
+					if err != nil {
+						return err
+					}
+					skillsDir := filepath.Join(repoPath, opts.path)
+					allSkills, err := skills.Discover(skillsDir)
+					if err != nil {
+						return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
+					}
+					selected, missing = skills.Filter(allSkills, opts.skills.values)
+					if len(missing) > 0 {
+						return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
+					}
+					if len(selected) == 0 {
+						return fmt.Errorf("no skills found in %s", skillsDir)
+					}
+					selectedNames = skillNames(selected)
 				}
 			}
-			skillsDir := filepath.Join(repoPath, opts.path)
-			allSkills, err := skills.Discover(skillsDir)
-			if err != nil {
-				return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
+
+			if opts.dryRun {
+				if _, err := os.Stat(dest); err != nil {
+					if os.IsNotExist(err) {
+						utils.PrintInfo("Dry run: would create destination directory %s", dest)
+					} else {
+						return err
+					}
+				}
+				if len(selectedNames) == 0 {
+					utils.PrintInfo("Dry run: would install skills from %s to %s", source, dest)
+					utils.PrintWarn("Dry run skipped cloning; use --skill to specify skills explicitly.")
+					return nil
+				}
+				utils.PrintInfo("Dry run: would install %d skill(s) to %s", len(selectedNames), dest)
+				for _, name := range selectedNames {
+					if exists(dest, name) {
+						if opts.overwrite {
+							utils.PrintInfo("Would overwrite %s", name)
+						} else if opts.skip {
+							utils.PrintInfo("Would skip %s", name)
+						} else {
+							utils.PrintInfo("Would prompt for %s (already exists)", name)
+						}
+					} else {
+						utils.PrintInfo("Would install %s", name)
+					}
+				}
+				return nil
 			}
-			selected, missing := skills.Filter(allSkills, opts.skills.values)
-			if len(missing) > 0 {
-				return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
+
+			if err := utils.EnsureDir(dest); err != nil {
+				return err
 			}
 			if len(selected) == 0 {
-				return fmt.Errorf("no skills found in %s", skillsDir)
+				return errors.New("no skills selected")
 			}
 			utils.PrintInfo("Installing %d skill(s) to %s", len(selected), dest)
 			mode := "ask"
@@ -130,10 +190,6 @@ func newAddCommand() *Command {
 					utils.PrintInfo("Skipping %s", skill.Name)
 					continue
 				}
-				if opts.dryRun {
-					utils.PrintInfo("Would install %s", skill.Name)
-					continue
-				}
 				err := skills.CopySkill(skill, dest, overwrite)
 				if errors.Is(err, os.ErrExist) {
 					utils.PrintWarn("Skill %s already exists", skill.Name)
@@ -168,6 +224,17 @@ func promptConflict(skillName string) (string, error) {
 		return "", err
 	}
 	return selection, nil
+}
+
+func skillNames(items []skills.Skill) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		names = append(names, item.Name)
+	}
+	return names
 }
 
 // multiString is a repeatable flag for --skill.

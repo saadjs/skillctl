@@ -39,6 +39,24 @@ func TestAddListRemoveLocalRepo(t *testing.T) {
 	}
 }
 
+func TestDryRunDoesNotCreateDest(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "de-dupe", "SKILL.md"), "# de-dupe\n")
+
+	destBase := t.TempDir()
+	destDir := filepath.Join(destBase, "dest")
+
+	out := runSkillctl(t, "add", repoDir, "--dest", destDir, "--skill", "de-dupe", "--dry-run")
+	if !strings.Contains(out, "Dry run") {
+		t.Fatalf("expected dry-run output, got: %s", out)
+	}
+	if _, err := os.Stat(destDir); err == nil || !os.IsNotExist(err) {
+		t.Fatalf("expected dest directory not to be created")
+	}
+}
+
 func runSkillctl(t *testing.T, args ...string) string {
 	t.Helper()
 	cmdArgs := append([]string{"run", "./cmd/skillctl"}, args...)
