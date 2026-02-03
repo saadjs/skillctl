@@ -60,7 +60,7 @@ func Resolve(tool Tool, scope Scope, cwd string) (string, error) {
 		if scope == ScopeGlobal {
 			path = "~/.codex/skills"
 		} else {
-			path = "./codex/skills"
+			path = "./.codex/skills"
 		}
 	case ToolClaude:
 		if scope == ScopeGlobal {
