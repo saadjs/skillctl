@@ -32,7 +32,7 @@ After `$git-incremental-commits` finishes (working tree clean), push the branch 
 4. Determine PR base branch.
    - Prefer the repo default branch: `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`
 
-5. Create a PR body in this format.
+5. Write a PR body in this format (human summary, not diffstats).
 
 - Include these headings exactly:
   1. `## Summary`
@@ -50,17 +50,12 @@ After `$git-incremental-commits` finishes (working tree clean), push the branch 
   - Override with `PR_TITLE="..."` if needed.
 
 - Body:
-  - Use the helper script:
-    - `./skills/gh-pr-create/scripts/gh-pr-create.sh`
-  - Or inline:
-    - `gh pr create --title "..." --body "..."`
+  - Use `--body` or `--body-file`:
+    - `gh pr create --title "..." --body-file /tmp/pr-body.md`
 
 ## Notes
 
 - Keep the PR body concise but specific.
 - If there are multiple major changes, list them as bullets under `## Major changes`.
 - If tests are not configured, omit the entire `## Tests` section (do not include an empty heading).
-- The helper script auto-detects when to include `## Tests` and `## Screenshots`.
-  - Overrides:
-    - `PR_TESTS=1` force include, `PR_TESTS=0` force omit
-    - `PR_SCREENSHOTS=1` force include, `PR_SCREENSHOTS=0` force omit
+- Avoid including raw `git diff --stat` output in `## Summary` (GitHub already provides file-level diff context).
