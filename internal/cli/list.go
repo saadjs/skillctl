@@ -17,7 +17,7 @@ type listOptions struct {
 func newListCommand() *Command {
 	opts := &listOptions{}
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
-	fs.StringVar(&opts.tool, "tool", "", "Tool name (codex|claude|cursor|windsurf|copilot)")
+	fs.StringVar(&opts.tool, "tool", "", "Tool name (agents|codex|claude|cursor|windsurf|copilot)")
 	fs.StringVar(&opts.scope, "scope", "", "Scope (global|project)")
 	fs.StringVar(&opts.dest, "dest", "", "Destination path (overrides tool/scope)")
 	fs.BoolVar(&opts.yes, "yes", false, "Non-interactive mode")
