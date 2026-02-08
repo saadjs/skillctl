@@ -30,7 +30,7 @@ type addOptions struct {
 func newAddCommand() *Command {
 	opts := &addOptions{}
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
-	fs.StringVar(&opts.tool, "tool", "", "Tool name (codex|claude|cursor|windsurf|copilot)")
+	fs.StringVar(&opts.tool, "tool", "", "Tool name (agents|codex|claude|cursor|windsurf|copilot)")
 	fs.StringVar(&opts.scope, "scope", "", "Scope (global|project)")
 	fs.StringVar(&opts.dest, "dest", "", "Destination path (overrides tool/scope)")
 	fs.StringVar(&opts.ref, "ref", "", "Git ref (branch, tag, or sha)")

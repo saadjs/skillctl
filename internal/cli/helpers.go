@@ -35,23 +35,39 @@ func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string,
 			return "", fmt.Errorf("--yes requires --tool and --scope or --dest")
 		}
 	} else {
-		if tool == "" {
-			options := []string{}
-			for _, t := range paths.Tools() {
-				options = append(options, string(t))
-			}
-			selection, err := prompts.AskSelect("Select tool", options)
-			if err != nil {
-				return "", err
-			}
-			tool, _ = paths.ParseTool(selection)
-		}
 		if scope == "" {
 			selection, err := prompts.AskSelect("Select scope", []string{"global", "project"})
 			if err != nil {
 				return "", err
 			}
 			scope, _ = paths.ParseScope(selection)
+		}
+		if tool == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return "", err
+			}
+			options := []string{}
+			toolMap := make(map[string]paths.Tool)
+			for _, t := range paths.Tools() {
+				resolved, err := paths.Resolve(t, scope, cwd)
+				if err != nil {
+					continue
+				}
+				// Shorten home directory to ~ for display
+				display := resolved
+				if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(resolved, home) {
+					display = "~" + resolved[len(home):]
+				}
+				option := fmt.Sprintf("%s (%s)", t, display)
+				options = append(options, option)
+				toolMap[option] = t
+			}
+			selection, err := prompts.AskSelect("Select tool", options)
+			if err != nil {
+				return "", err
+			}
+			tool = toolMap[selection]
 		}
 	}
 	cwd, err := os.Getwd()

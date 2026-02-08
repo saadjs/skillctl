@@ -11,11 +11,12 @@ import (
 type Tool string
 
 const (
-	ToolCodex   Tool = "codex"
-	ToolClaude  Tool = "claude"
-	ToolCursor  Tool = "cursor"
+	ToolAgents   Tool = "agents"
+	ToolCodex    Tool = "codex"
+	ToolClaude   Tool = "claude"
+	ToolCursor   Tool = "cursor"
 	ToolWindsurf Tool = "windsurf"
-	ToolCopilot Tool = "copilot"
+	ToolCopilot  Tool = "copilot"
 )
 
 type Scope string
@@ -25,7 +26,7 @@ const (
 	ScopeProject Scope = "project"
 )
 
-var tools = []Tool{ToolCodex, ToolClaude, ToolCursor, ToolWindsurf, ToolCopilot}
+var tools = []Tool{ToolAgents, ToolCodex, ToolClaude, ToolCursor, ToolWindsurf, ToolCopilot}
 
 func Tools() []Tool {
 	return tools
@@ -56,6 +57,12 @@ func ParseScope(value string) (Scope, error) {
 func Resolve(tool Tool, scope Scope, cwd string) (string, error) {
 	var path string
 	switch tool {
+	case ToolAgents:
+		if scope == ScopeGlobal {
+			path = "~/.agents/skills"
+		} else {
+			path = "./.agents/skills"
+		}
 	case ToolCodex:
 		if scope == ScopeGlobal {
 			path = "~/.codex/skills"

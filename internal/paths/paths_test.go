@@ -18,6 +18,9 @@ func TestResolvePaths(t *testing.T) {
 		scope Scope
 		want  string
 	}{
+		// agents should be first as the new standard
+		{ToolAgents, ScopeGlobal, filepath.Join(home, ".agents", "skills")},
+		{ToolAgents, ScopeProject, filepath.Join(cwd, ".agents", "skills")},
 		{ToolCodex, ScopeGlobal, filepath.Join(home, ".codex", "skills")},
 		{ToolCodex, ScopeProject, filepath.Join(cwd, ".codex", "skills")},
 		{ToolClaude, ScopeGlobal, filepath.Join(home, ".claude", "skill")},
