@@ -98,6 +98,19 @@ func TestScanReportsFindingForOversizedFile(t *testing.T) {
 	}
 }
 
+func TestScanReportsFindingForBinaryFile(t *testing.T) {
+	root := t.TempDir()
+	mustWriteBytes(t, filepath.Join(root, "payload.bin"), []byte{0x00, 0x01, 0x02})
+
+	report, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan failed: %v", err)
+	}
+	if !hasRule(report.Findings, "unscanned_binary") {
+		t.Fatalf("expected unscanned_binary finding, got: %#v", report.Findings)
+	}
+}
+
 func hasRule(findings []Finding, ruleID string) bool {
 	for _, finding := range findings {
 		if finding.RuleID == ruleID {

@@ -131,6 +131,25 @@ func TestAddBlocksOnOversizedContentInYesMode(t *testing.T) {
 	}
 }
 
+func TestAddBlocksOnBinaryContentInYesMode(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+	if err := os.WriteFile(filepath.Join(repoDir, "payload.bin"), []byte{0x00, 0x01, 0x02}, 0o644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	destDir := t.TempDir()
+	out := runSkillctlExpectError(t, "", "add", repoDir, "--dest", destDir, "--skill", "alpha", "--yes")
+	if !strings.Contains(out, "unscanned_binary") {
+		t.Fatalf("expected binary finding, got: %s", out)
+	}
+	if !strings.Contains(out, "security scan found potential malicious content") {
+		t.Fatalf("expected security error, got: %s", out)
+	}
+}
+
 func TestAddForceBypassesSecurityFindings(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")

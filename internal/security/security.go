@@ -102,6 +102,14 @@ func Scan(root string) (Report, error) {
 		}
 		if isBinary(data) {
 			report.skip("binary")
+			report.Findings = append(report.Findings, Finding{
+				RuleID:   "unscanned_binary",
+				Severity: SeverityHigh,
+				Path:     rel,
+				Line:     1,
+				Message:  "Binary file was not scanned and is treated as unsafe",
+				Evidence: fmt.Sprintf("%d bytes", len(data)),
+			})
 			return nil
 		}
 
