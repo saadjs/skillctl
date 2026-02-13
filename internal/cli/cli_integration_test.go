@@ -91,6 +91,46 @@ func TestAddBlocksOnSecurityFindingsInYesMode(t *testing.T) {
 	}
 }
 
+func TestAddBlocksOnSymlinkedContentInYesMode(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+	targetFile := filepath.Join(repoDir, "scripts", "install.sh")
+	mustWrite(t, targetFile, "echo safe\n")
+	if err := os.Symlink(targetFile, filepath.Join(repoDir, "skills", "alpha", "linked.sh")); err != nil {
+		t.Fatalf("symlink failed: %v", err)
+	}
+
+	destDir := t.TempDir()
+	out := runSkillctlExpectError(t, "", "add", repoDir, "--dest", destDir, "--skill", "alpha", "--yes")
+	if !strings.Contains(out, "unscanned_symlink") {
+		t.Fatalf("expected symlink finding, got: %s", out)
+	}
+	if !strings.Contains(out, "security scan found potential malicious content") {
+		t.Fatalf("expected security error, got: %s", out)
+	}
+}
+
+func TestAddBlocksOnOversizedContentInYesMode(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+	if err := os.WriteFile(filepath.Join(repoDir, "payload.txt"), bytes.Repeat([]byte("a"), 1024*1024+1), 0o644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	destDir := t.TempDir()
+	out := runSkillctlExpectError(t, "", "add", repoDir, "--dest", destDir, "--skill", "alpha", "--yes")
+	if !strings.Contains(out, "unscanned_too_large") {
+		t.Fatalf("expected too-large finding, got: %s", out)
+	}
+	if !strings.Contains(out, "security scan found potential malicious content") {
+		t.Fatalf("expected security error, got: %s", out)
+	}
+}
+
 func TestAddForceBypassesSecurityFindings(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")

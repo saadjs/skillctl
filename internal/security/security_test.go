@@ -68,6 +68,36 @@ func TestScanSkipsBinaryAndLargeFiles(t *testing.T) {
 	}
 }
 
+func TestScanReportsFindingForSymlinkedFile(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	if err := os.Symlink(filepath.Join(root, "skills", "alpha", "SKILL.md"), filepath.Join(root, "skills", "link.md")); err != nil {
+		t.Fatalf("symlink failed: %v", err)
+	}
+
+	report, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan failed: %v", err)
+	}
+	if !hasRule(report.Findings, "unscanned_symlink") {
+		t.Fatalf("expected unscanned_symlink finding, got: %#v", report.Findings)
+	}
+}
+
+func TestScanReportsFindingForOversizedFile(t *testing.T) {
+	root := t.TempDir()
+	mustWriteBytes(t, filepath.Join(root, "skills", "alpha", "SKILL.md"), bytes.Repeat([]byte("a"), int(maxFileSizeBytes+1)))
+
+	report, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan failed: %v", err)
+	}
+	if !hasRule(report.Findings, "unscanned_too_large") {
+		t.Fatalf("expected unscanned_too_large finding, got: %#v", report.Findings)
+	}
+}
+
 func hasRule(findings []Finding, ruleID string) bool {
 	for _, finding := range findings {
 		if finding.RuleID == ruleID {

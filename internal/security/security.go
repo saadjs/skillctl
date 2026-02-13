@@ -57,8 +57,26 @@ func Scan(root string) (Report, error) {
 			}
 			return nil
 		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+
 		if d.Type()&os.ModeSymlink != 0 {
 			report.skip("symlink")
+			target, err := os.Readlink(path)
+			if err != nil {
+				return fmt.Errorf("readlink %s: %w", path, err)
+			}
+			report.Findings = append(report.Findings, Finding{
+				RuleID:   "unscanned_symlink",
+				Severity: SeverityCritical,
+				Path:     rel,
+				Line:     1,
+				Message:  "Symlink file was not scanned and is treated as unsafe",
+				Evidence: sanitizeEvidence(target),
+			})
 			return nil
 		}
 		info, err := d.Info()
@@ -67,6 +85,14 @@ func Scan(root string) (Report, error) {
 		}
 		if info.Size() > maxFileSizeBytes {
 			report.skip("too_large")
+			report.Findings = append(report.Findings, Finding{
+				RuleID:   "unscanned_too_large",
+				Severity: SeverityHigh,
+				Path:     rel,
+				Line:     1,
+				Message:  "File exceeds scan size limit and is treated as unsafe",
+				Evidence: fmt.Sprintf("%d > %d bytes", info.Size(), maxFileSizeBytes),
+			})
 			return nil
 		}
 
@@ -80,11 +106,6 @@ func Scan(root string) (Report, error) {
 		}
 
 		report.FilesScanned++
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
 		report.Findings = append(report.Findings, scanContent(rel, string(data))...)
 		return nil
 	})
