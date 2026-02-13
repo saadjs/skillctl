@@ -86,7 +86,8 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
      - `gh pr view "$PR_NUMBER" ${REPO:+--repo "$REPO"} --json commits -q '.commits[].oid'`
    - For each **meaningful** addressed comment, post a reply on the same thread when possible:
      - Inline review comment reply:
-       - `gh api -X POST "repos/$REPO/pulls/comments/<comment_id>/replies" -f body='<reply>'`
+       - `gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/comments/<comment_id>/replies" -f body='<reply>'`
+       - If this returns `404`, verify the endpoint includes `pulls/$PR_NUMBER/comments/...` and that `REPO` is `owner/name`.
    - For issue-level PR comments (no inline thread), post a new issue comment that references the original comment URL:
      - `gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body='<reply>'`
    - Reply body requirements:
