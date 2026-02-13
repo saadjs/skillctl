@@ -14,6 +14,7 @@ Resolve actionable PR feedback end-to-end with evidence:
 3. Apply minimal fixes.
 4. Run the full test suite.
 5. Commit and push updates.
+6. Post reply comments describing what was fixed in the latest commit(s).
 
 ## Required Input
 
@@ -75,18 +76,34 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 
 6. Commit and push.
    - Review final diff for comment-to-change traceability.
-   - Commit with a focused message, for example:
+   - Commit with focused message(s), for example:
      - `fix(pr-123): address review comments with regression coverage`
    - Push branch updates:
      - `git push` (or `git push -u origin HEAD` when no upstream exists)
 
-7. Report completion.
+7. Post GitHub reply comments after push.
+   - Capture latest pushed commits for reference links, for example:
+     - `gh pr view "$PR_NUMBER" ${REPO:+--repo "$REPO"} --json commits -q '.commits[].oid'`
+   - For each **meaningful** addressed comment, post a reply on the same thread when possible:
+     - Inline review comment reply:
+       - `gh api -X POST "repos/$REPO/pulls/comments/<comment_id>/replies" -f body='<reply>'`
+   - For issue-level PR comments (no inline thread), post a new issue comment that references the original comment URL:
+     - `gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body='<reply>'`
+   - Reply body requirements:
+     - Start with what changed to address the concern.
+     - Include the latest commit SHA(s) that contain the fix.
+     - Mention test evidence when applicable.
+   - Example reply:
+     - `Fixed by validating empty payloads in request parsing and adding regression coverage in api/request_parser_test.go. Included in commits abc1234 and def5678; full test suite now passes.`
+
+8. Report completion.
    - Summarize:
      - meaningful comments addressed
      - comments rejected as non-meaningful (with brief rationale)
      - regression tests added
      - full-suite test result
      - pushed branch name
+     - reply comments posted (count and any skipped with reason)
 
 ## Guardrails
 
@@ -95,4 +112,5 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
   - a regression test that failed before the fix and passes after, or
   - a short explicit reason why the comment is non-testable.
 - Do not push if the full suite fails.
+- Do not finish after push until comment replies are posted (or explicitly skipped with reason).
 - Keep changes scoped to comment resolution.
