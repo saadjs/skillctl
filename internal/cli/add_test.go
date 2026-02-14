@@ -173,6 +173,56 @@ func TestAddRemoteDryRunRequiresSkill(t *testing.T) {
 	}
 }
 
+func TestAddRemoteCloneIsCleanedUpOnSecurityBlock(t *testing.T) {
+	destDir := filepath.Join(t.TempDir(), "dest")
+	cloneBase := filepath.Join(t.TempDir(), "clone")
+	clonePath := filepath.Join(cloneBase, "repo")
+	if err := os.MkdirAll(clonePath, 0o755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+
+	origClone := cloneRepo
+	origScan := scanRepo
+	defer func() {
+		cloneRepo = origClone
+		scanRepo = origScan
+	}()
+
+	cloneRepo = func(repoURL, ref string) (string, error) {
+		return clonePath, nil
+	}
+	scanRepo = func(root string) (security.Report, error) {
+		return security.Report{
+			Findings: []security.Finding{
+				{
+					RuleID:   "test_rule",
+					Severity: security.SeverityHigh,
+					Path:     "skills/alpha/SKILL.md",
+					Line:     1,
+					Message:  "test finding",
+				},
+			},
+		}, nil
+	}
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--dest", destDir,
+		"--yes",
+		"owner/repo",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil || !strings.Contains(err.Error(), "security scan found potential malicious content") {
+		t.Fatalf("expected security block error, got: %v", err)
+	}
+	if _, err := os.Stat(cloneBase); err == nil || !os.IsNotExist(err) {
+		t.Fatalf("expected cloned repo temp dir removed, stat err: %v", err)
+	}
+}
+
 func withStdin(t *testing.T, input string) func() {
 	t.Helper()
 	orig := os.Stdin

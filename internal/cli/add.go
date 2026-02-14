@@ -95,6 +95,13 @@ func newAddCommand() *Command {
 					if err != nil {
 						return err
 					}
+					cleanupCloneDir := filepath.Dir(repoPath)
+					defer func() {
+						if cleanupCloneDir == "" {
+							return
+						}
+						_ = os.RemoveAll(cleanupCloneDir)
+					}()
 				}
 			}
 
