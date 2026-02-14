@@ -10,6 +10,7 @@ import (
 
 	"github.com/saadjs/agent-skills/internal/git"
 	"github.com/saadjs/agent-skills/internal/prompts"
+	"github.com/saadjs/agent-skills/internal/security"
 	"github.com/saadjs/agent-skills/internal/skills"
 	"github.com/saadjs/agent-skills/internal/utils"
 )
@@ -23,9 +24,13 @@ type addOptions struct {
 	skills    multiString
 	overwrite bool
 	skip      bool
+	force     bool
 	yes       bool
 	dryRun    bool
 }
+
+var cloneRepo = git.Clone
+var scanRepo = security.Scan
 
 func newAddCommand() *Command {
 	opts := &addOptions{}
@@ -38,6 +43,7 @@ func newAddCommand() *Command {
 	fs.Var(&opts.skills, "skill", "Skill to install (repeatable)")
 	fs.BoolVar(&opts.overwrite, "overwrite", false, "Overwrite existing skills")
 	fs.BoolVar(&opts.skip, "skip", false, "Skip skills that already exist")
+	fs.BoolVar(&opts.force, "force", false, "Bypass security findings and continue")
 	fs.BoolVar(&opts.yes, "yes", false, "Non-interactive mode")
 	fs.BoolVar(&opts.dryRun, "dry-run", false, "Print actions without changes")
 
@@ -64,20 +70,60 @@ func newAddCommand() *Command {
 			if err != nil {
 				return err
 			}
-
+			performScan := true
 			var selected []skills.Skill
 			var selectedNames []string
-			var missing []string
 
 			if isLocal {
 				if opts.ref != "" {
 					return errors.New("--ref is not supported for local paths")
 				}
+			} else {
+				repo, err := utils.NormalizeRepo(source)
+				if err != nil {
+					return err
+				}
+				if opts.dryRun {
+					performScan = false
+					if len(opts.skills.values) == 0 {
+						return errors.New("--dry-run with remote source requires at least one --skill")
+					}
+					selectedNames = append(selectedNames, opts.skills.values...)
+				} else {
+					repoURL := utils.RepoURL(repo)
+					repoPath, err = cloneRepo(repoURL, opts.ref)
+					if err != nil {
+						return err
+					}
+					cleanupCloneDir := filepath.Dir(repoPath)
+					defer func() {
+						if cleanupCloneDir == "" {
+							return
+						}
+						_ = os.RemoveAll(cleanupCloneDir)
+					}()
+				}
+			}
+
+			if performScan {
 				skillsDir := filepath.Join(repoPath, opts.path)
+				securityReport, err := scanRepo(skillsDir)
+				if err != nil {
+					return fmt.Errorf("security scan failed: %w", err)
+				}
+				printSecurityScanReport(securityReport)
+				if opts.dryRun {
+					utils.PrintInfo("Dry run: security scan executed.")
+				}
+				if err := enforceSecurityDecision(securityReport, opts.force, opts.yes); err != nil {
+					return err
+				}
+
 				allSkills, err := skills.Discover(skillsDir)
 				if err != nil {
 					return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
 				}
+				missing := []string(nil)
 				selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
 				if len(missing) > 0 {
 					return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
@@ -86,49 +132,18 @@ func newAddCommand() *Command {
 					return fmt.Errorf("no skills found in %s", skillsDir)
 				}
 				selectedNames = skillNames(selected)
-			} else {
-				repo, err := utils.NormalizeRepo(source)
-				if err != nil {
-					return err
-				}
-				if opts.dryRun {
-					if len(opts.skills.values) > 0 {
-						selectedNames = opts.skills.values
-					}
-				} else {
-					repoURL := utils.RepoURL(repo)
-					repoPath, err = git.Clone(repoURL, opts.ref)
-					if err != nil {
-						return err
-					}
-					skillsDir := filepath.Join(repoPath, opts.path)
-					allSkills, err := skills.Discover(skillsDir)
-					if err != nil {
-						return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
-					}
-					selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
-					if len(missing) > 0 {
-						return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
-					}
-					if len(selected) == 0 {
-						return fmt.Errorf("no skills found in %s", skillsDir)
-					}
-					selectedNames = skillNames(selected)
-				}
 			}
 
 			if opts.dryRun {
+				if !performScan {
+					utils.PrintInfo("Dry run: remote source was not cloned; security scan skipped.")
+				}
 				if _, err := os.Stat(dest); err != nil {
 					if os.IsNotExist(err) {
 						utils.PrintInfo("Dry run: would create destination directory %s", dest)
 					} else {
 						return err
 					}
-				}
-				if len(selectedNames) == 0 {
-					utils.PrintInfo("Dry run: would install skills from %s to %s", source, dest)
-					utils.PrintWarn("Dry run skipped cloning; use --skill to specify skills explicitly.")
-					return nil
 				}
 				utils.PrintInfo("Dry run: would install %d skill(s) to %s", len(selectedNames), dest)
 				for _, name := range selectedNames {
@@ -204,6 +219,38 @@ func newAddCommand() *Command {
 		},
 	}
 	return cmd
+}
+
+func printSecurityScanReport(report security.Report) {
+	utils.PrintInfo("%s", security.Summary(report))
+	if len(report.Findings) == 0 {
+		return
+	}
+	for _, line := range security.DetailLines(report) {
+		utils.PrintWarn("%s", line)
+	}
+}
+
+func enforceSecurityDecision(report security.Report, force, yes bool) error {
+	if len(report.Findings) == 0 {
+		return nil
+	}
+	if force {
+		utils.PrintWarn("Proceeding despite security findings because --force was provided.")
+		return nil
+	}
+	if yes {
+		return errors.New("security scan found potential malicious content; rerun with --force to continue")
+	}
+	approved, err := prompts.AskYesNo("Continue despite security findings?", false)
+	if err != nil {
+		return err
+	}
+	if !approved {
+		return errors.New("canceled due to security findings")
+	}
+	utils.PrintWarn("Proceeding despite security findings by user confirmation.")
+	return nil
 }
 
 func exists(destRoot, name string) bool {
