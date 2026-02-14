@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -158,6 +160,30 @@ func TestAddBlocksOnBinaryContentInYesMode(t *testing.T) {
 	out := runSkillctlExpectError(t, "", "add", repoDir, "--dest", destDir, "--skill", "alpha", "--yes")
 	if !strings.Contains(out, "unscanned_binary") {
 		t.Fatalf("expected binary finding, got: %s", out)
+	}
+	if !strings.Contains(out, "security scan found potential malicious content") {
+		t.Fatalf("expected security error, got: %s", out)
+	}
+}
+
+func TestAddBlocksOnNonRegularContentInYesMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("mkfifo is not supported on windows")
+	}
+
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+	pipePath := filepath.Join(skillsDir, "alpha", "pipe.fifo")
+	if err := syscall.Mkfifo(pipePath, 0o644); err != nil {
+		t.Fatalf("mkfifo failed: %v", err)
+	}
+
+	destDir := t.TempDir()
+	out := runSkillctlExpectError(t, "", "add", repoDir, "--dest", destDir, "--skill", "alpha", "--yes", "--dry-run")
+	if !strings.Contains(out, "unscanned_non_regular") {
+		t.Fatalf("expected non-regular finding, got: %s", out)
 	}
 	if !strings.Contains(out, "security scan found potential malicious content") {
 		t.Fatalf("expected security error, got: %s", out)

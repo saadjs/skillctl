@@ -147,6 +147,9 @@ func TestScanSkipsNamedPipeFile(t *testing.T) {
 	if report.SkipReasons["non_regular"] == 0 {
 		t.Fatalf("expected non_regular skip reason, got %#v", report.SkipReasons)
 	}
+	if !hasRule(report.Findings, "unscanned_non_regular") {
+		t.Fatalf("expected unscanned_non_regular finding, got: %#v", report.Findings)
+	}
 }
 
 func hasRule(findings []Finding, ruleID string) bool {

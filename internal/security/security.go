@@ -85,6 +85,14 @@ func Scan(root string) (Report, error) {
 		}
 		if !info.Mode().IsRegular() {
 			report.skip("non_regular")
+			report.Findings = append(report.Findings, Finding{
+				RuleID:   "unscanned_non_regular",
+				Severity: SeverityHigh,
+				Path:     rel,
+				Line:     1,
+				Message:  "Non-regular file was not scanned and is treated as unsafe",
+				Evidence: info.Mode().String(),
+			})
 			return nil
 		}
 		if info.Size() > maxFileSizeBytes {
