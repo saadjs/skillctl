@@ -83,6 +83,10 @@ func Scan(root string) (Report, error) {
 		if err != nil {
 			return err
 		}
+		if !info.Mode().IsRegular() {
+			report.skip("non_regular")
+			return nil
+		}
 		if info.Size() > maxFileSizeBytes {
 			report.skip("too_large")
 			report.Findings = append(report.Findings, Finding{

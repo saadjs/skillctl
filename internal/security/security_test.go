@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestScanDetectsMaliciousCommandPattern(t *testing.T) {
@@ -108,6 +111,41 @@ func TestScanReportsFindingForBinaryFile(t *testing.T) {
 	}
 	if !hasRule(report.Findings, "unscanned_binary") {
 		t.Fatalf("expected unscanned_binary finding, got: %#v", report.Findings)
+	}
+}
+
+func TestScanSkipsNamedPipeFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("named pipes via mkfifo are not supported on windows")
+	}
+
+	root := t.TempDir()
+	pipePath := filepath.Join(root, "pipe.fifo")
+	if err := syscall.Mkfifo(pipePath, 0o644); err != nil {
+		t.Fatalf("mkfifo failed: %v", err)
+	}
+
+	writer, err := os.OpenFile(pipePath, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatalf("open fifo failed: %v", err)
+	}
+	if _, err := writer.Write([]byte("safe content\n")); err != nil {
+		t.Fatalf("write fifo failed: %v", err)
+	}
+	done := make(chan struct{})
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		_ = writer.Close()
+		close(done)
+	}()
+
+	report, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan failed: %v", err)
+	}
+	<-done
+	if report.SkipReasons["non_regular"] == 0 {
+		t.Fatalf("expected non_regular skip reason, got %#v", report.SkipReasons)
 	}
 }
 
