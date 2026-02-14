@@ -39,12 +39,13 @@ skillctl remove --tool agents --scope project --skill de-dupe
 
 ### Security Scan During Install
 
-`skillctl add` performs a built-in security scan before installing skills. The scan checks the full source repository (local path or cloned GitHub repo) for suspicious commands, potential exfiltration patterns, and malicious agent instructions.
+`skillctl add` performs a built-in security scan before installing skills. The scan checks the configured skills subtree (`--path`, default `skills`) in the source for suspicious commands, potential exfiltration patterns, and malicious agent instructions.
 
 - If findings are detected, install is blocked by default.
 - In interactive mode, you can confirm and continue.
 - In non-interactive mode (`--yes`), rerun with `--force` to bypass.
-- `--dry-run` also executes the security scan, but does not install files.
+- `--dry-run` on local sources executes the security scan, but does not install files.
+- `--dry-run` on remote sources does not clone or scan, and requires at least one `--skill` value.
 
 Example flows:
 
@@ -55,7 +56,7 @@ skillctl add owner/repo --tool agents --scope global --yes
 # Explicit bypass for automation/non-interactive environments
 skillctl add owner/repo --tool agents --scope global --yes --force
 
-# Dry run still scans, but performs no install writes
+# Local dry run still scans, but performs no install writes
 skillctl add owner/repo --tool agents --scope global --dry-run --yes --force
 ```
 

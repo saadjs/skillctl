@@ -70,6 +70,9 @@ func newAddCommand() *Command {
 			if err != nil {
 				return err
 			}
+			performScan := true
+			var selected []skills.Skill
+			var selectedNames []string
 
 			if isLocal {
 				if opts.ref != "" {
@@ -80,40 +83,54 @@ func newAddCommand() *Command {
 				if err != nil {
 					return err
 				}
-				repoURL := utils.RepoURL(repo)
-				repoPath, err = cloneRepo(repoURL, opts.ref)
-				if err != nil {
-					return err
+				if opts.dryRun {
+					performScan = false
+					if len(opts.skills.values) == 0 {
+						return errors.New("--dry-run with remote source requires at least one --skill")
+					}
+					selectedNames = append(selectedNames, opts.skills.values...)
+				} else {
+					repoURL := utils.RepoURL(repo)
+					repoPath, err = cloneRepo(repoURL, opts.ref)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
-			skillsDir := filepath.Join(repoPath, opts.path)
-			securityReport, err := scanRepo(skillsDir)
-			if err != nil {
-				return fmt.Errorf("security scan failed: %w", err)
-			}
-			printSecurityScanReport(securityReport)
-			if opts.dryRun {
-				utils.PrintInfo("Dry run: security scan executed.")
-			}
-			if err := enforceSecurityDecision(securityReport, opts.force, opts.yes); err != nil {
-				return err
+			if performScan {
+				skillsDir := filepath.Join(repoPath, opts.path)
+				securityReport, err := scanRepo(skillsDir)
+				if err != nil {
+					return fmt.Errorf("security scan failed: %w", err)
+				}
+				printSecurityScanReport(securityReport)
+				if opts.dryRun {
+					utils.PrintInfo("Dry run: security scan executed.")
+				}
+				if err := enforceSecurityDecision(securityReport, opts.force, opts.yes); err != nil {
+					return err
+				}
+
+				allSkills, err := skills.Discover(skillsDir)
+				if err != nil {
+					return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
+				}
+				missing := []string(nil)
+				selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
+				if len(missing) > 0 {
+					return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
+				}
+				if len(selected) == 0 {
+					return fmt.Errorf("no skills found in %s", skillsDir)
+				}
+				selectedNames = skillNames(selected)
 			}
 
-			allSkills, err := skills.Discover(skillsDir)
-			if err != nil {
-				return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
-			}
-			selected, missing := chooseSkills(allSkills, opts.skills.values, opts.yes)
-			if len(missing) > 0 {
-				return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
-			}
-			if len(selected) == 0 {
-				return fmt.Errorf("no skills found in %s", skillsDir)
-			}
-			selectedNames := skillNames(selected)
-
 			if opts.dryRun {
+				if !performScan {
+					utils.PrintInfo("Dry run: remote source was not cloned; security scan skipped.")
+				}
 				if _, err := os.Stat(dest); err != nil {
 					if os.IsNotExist(err) {
 						utils.PrintInfo("Dry run: would create destination directory %s", dest)

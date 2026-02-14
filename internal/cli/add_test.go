@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -74,10 +75,8 @@ func TestChooseSkillsPromptSubset(t *testing.T) {
 	}
 }
 
-func TestAddRemoteDryRunRunsCloneAndScan(t *testing.T) {
-	repoDir := t.TempDir()
+func TestAddRemoteDryRunSkipsCloneAndScan(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "dest")
-	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
 
 	origClone := cloneRepo
 	origScan := scanRepo
@@ -90,11 +89,11 @@ func TestAddRemoteDryRunRunsCloneAndScan(t *testing.T) {
 	scanCalls := 0
 	cloneRepo = func(repoURL, ref string) (string, error) {
 		cloneCalls++
-		return repoDir, nil
+		return "", errors.New("clone should not run in remote dry-run mode")
 	}
 	scanRepo = func(root string) (security.Report, error) {
 		scanCalls++
-		return security.Report{}, nil
+		return security.Report{}, errors.New("scan should not run in remote dry-run mode")
 	}
 
 	restoreOutput, output := captureOutput(t)
@@ -113,18 +112,64 @@ func TestAddRemoteDryRunRunsCloneAndScan(t *testing.T) {
 	if err := cmd.Run(positional); err != nil {
 		t.Fatalf("run failed: %v", err)
 	}
-	if cloneCalls != 1 {
-		t.Fatalf("expected clone called once, got %d", cloneCalls)
+	if cloneCalls != 0 {
+		t.Fatalf("expected clone not called, got %d", cloneCalls)
 	}
-	if scanCalls != 1 {
-		t.Fatalf("expected scan called once, got %d", scanCalls)
+	if scanCalls != 0 {
+		t.Fatalf("expected scan not called, got %d", scanCalls)
 	}
 	restoreOutput()
-	if !strings.Contains(output.String(), "Dry run: security scan executed.") {
-		t.Fatalf("expected security dry-run message, got: %s", output.String())
+	if !strings.Contains(output.String(), "Dry run: remote source was not cloned; security scan skipped.") {
+		t.Fatalf("expected remote dry-run skip message, got: %s", output.String())
+	}
+	if !strings.Contains(output.String(), "Would install alpha") {
+		t.Fatalf("expected skill preview in dry-run output, got: %s", output.String())
 	}
 	if _, err := os.Stat(destDir); err == nil || !os.IsNotExist(err) {
 		t.Fatalf("expected dest directory not to be created")
+	}
+}
+
+func TestAddRemoteDryRunRequiresSkill(t *testing.T) {
+	destDir := filepath.Join(t.TempDir(), "dest")
+
+	origClone := cloneRepo
+	origScan := scanRepo
+	defer func() {
+		cloneRepo = origClone
+		scanRepo = origScan
+	}()
+
+	cloneCalls := 0
+	scanCalls := 0
+	cloneRepo = func(repoURL, ref string) (string, error) {
+		cloneCalls++
+		return "", errors.New("clone should not run in remote dry-run mode")
+	}
+	scanRepo = func(root string) (security.Report, error) {
+		scanCalls++
+		return security.Report{}, errors.New("scan should not run in remote dry-run mode")
+	}
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--dest", destDir,
+		"--dry-run",
+		"--yes",
+		"owner/repo",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil || !strings.Contains(err.Error(), "--dry-run with remote source requires at least one --skill") {
+		t.Fatalf("expected missing skill error, got: %v", err)
+	}
+	if cloneCalls != 0 {
+		t.Fatalf("expected clone not called, got %d", cloneCalls)
+	}
+	if scanCalls != 0 {
+		t.Fatalf("expected scan not called, got %d", scanCalls)
 	}
 }
 
