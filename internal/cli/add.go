@@ -87,7 +87,8 @@ func newAddCommand() *Command {
 				}
 			}
 
-			securityReport, err := scanRepo(repoPath)
+			skillsDir := filepath.Join(repoPath, opts.path)
+			securityReport, err := scanRepo(skillsDir)
 			if err != nil {
 				return fmt.Errorf("security scan failed: %w", err)
 			}
@@ -99,7 +100,6 @@ func newAddCommand() *Command {
 				return err
 			}
 
-			skillsDir := filepath.Join(repoPath, opts.path)
 			allSkills, err := skills.Discover(skillsDir)
 			if err != nil {
 				return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
