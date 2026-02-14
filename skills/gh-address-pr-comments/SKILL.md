@@ -15,6 +15,7 @@ Resolve actionable PR feedback end-to-end with evidence:
 4. Run the full test suite.
 5. Commit and push updates.
 6. Post reply comments describing what was fixed in the latest commit(s).
+7. Re-request review from the original reviewer(s).
 
 ## Required Input
 
@@ -87,9 +88,12 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
    - For each **meaningful** addressed comment, post a reply on the same thread when possible:
      - Inline review comment reply:
        - `gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/comments/<comment_id>/replies" -f body='<reply>'`
-       - If this returns `404`, verify the endpoint includes `pulls/$PR_NUMBER/comments/...` and that `REPO` is `owner/name`.
+       - If this returns `404`, verify the endpoint includes `pulls/$PR_NUMBER/comments/<comment_id>/replies` and that `REPO` is `owner/name`.
    - For issue-level PR comments (no inline thread), post a new issue comment that references the original comment URL:
-     - `gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body='<reply>'`
+     - Prefer:
+       - `gh pr comment "$PR_NUMBER" ${REPO:+--repo "$REPO"} --body '<reply>'`
+     - Or API form:
+       - `gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body='<reply>'`
    - Reply body requirements:
      - Start with what changed to address the concern.
      - Include the latest commit SHA(s) that contain the fix.
@@ -97,7 +101,17 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
    - Example reply:
      - `Fixed by validating empty payloads in request parsing and adding regression coverage in api/request_parser_test.go. Included in commits abc1234 and def5678; full test suite now passes.`
 
-8. Report completion.
+8. Re-request review.
+   - Identify who to re-request from (example: unique review authors):
+     - `gh pr view "$PR_NUMBER" ${REPO:+--repo "$REPO"} --json reviews -q '.reviews[].author.login' | sort -u`
+   - Prefer native re-request mechanisms when available:
+     - Request review again from a GitHub user:
+       - `gh pr edit "$PR_NUMBER" ${REPO:+--repo "$REPO"} --add-reviewer <login>`
+   - For bot/agent reviewers that use comment-driven triggers, post the trigger comment (example):
+     - `gh pr comment "$PR_NUMBER" ${REPO:+--repo "$REPO"} --body '@codex review'`
+   - Guardrail: only ping re-review after fixes are pushed and reply threads are updated (or explicitly skipped with reason).
+
+9. Report completion.
    - Summarize:
      - meaningful comments addressed
      - comments rejected as non-meaningful (with brief rationale)
@@ -105,6 +119,7 @@ REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
      - full-suite test result
      - pushed branch name
      - reply comments posted (count and any skipped with reason)
+     - re-review requested (who was pinged and how)
 
 ## Guardrails
 
