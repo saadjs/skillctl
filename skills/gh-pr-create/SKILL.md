@@ -7,7 +7,7 @@ description: Create a GitHub Pull Request using the gh CLI after git-incremental
 
 ## Goal
 
-After `$git-incremental-commits` finishes (working tree clean), push the branch and open a PR with a consistent body format.
+After `$git-incremental-commits` finishes (working tree clean), push the branch, open a PR with a consistent body format, then ask who to request review from.
 
 ## Preconditions
 
@@ -52,6 +52,26 @@ After `$git-incremental-commits` finishes (working tree clean), push the branch 
 - Body:
   - Use `--body` or `--body-file`:
     - `gh pr create --title "..." --body-file /tmp/pr-body.md`
+
+7. After the PR is created, ask who to request review from.
+
+- Prompt the user for reviewers (GitHub usernames), supporting these special cases:
+  - `copilot`: request review via the GitHub CLI reviewer option.
+  - `codex`: request review by commenting `@codex review` on the PR.
+
+- If the user chose `copilot`:
+  - `gh pr edit --add-reviewer copilot`
+
+- If the user chose `codex`:
+  - `gh pr comment --body "@codex review"`
+
+- If the user provided other reviewer usernames (e.g. `octocat`, `hubot`):
+  - `gh pr edit --add-reviewer octocat,hubot`
+
+- If you need to explicitly target a PR (instead of relying on the current branch), resolve the PR number/URL first and pass it to the commands above:
+  - `gh pr view --json number,url -q .number`
+  - `gh pr edit <number-or-url> --add-reviewer ...`
+  - `gh pr comment <number-or-url> --body "@codex review"`
 
 ## Notes
 
