@@ -24,8 +24,8 @@ type SkillState struct {
 }
 
 type State struct {
-	LastSync string                `yaml:"last_sync"`
-	Skills   map[string]SkillState `yaml:"skills"`
+	LastSync string                              `yaml:"last_sync"`
+	Tools    map[string]map[string]SkillState    `yaml:"tools"`
 }
 
 func Dir() string {
@@ -74,7 +74,7 @@ func LoadState(path string) (*State, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &State{Skills: map[string]SkillState{}}, nil
+			return &State{Tools: map[string]map[string]SkillState{}}, nil
 		}
 		return nil, err
 	}
@@ -82,8 +82,8 @@ func LoadState(path string) (*State, error) {
 	if err := yaml.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("parsing state: %w", err)
 	}
-	if st.Skills == nil {
-		st.Skills = map[string]SkillState{}
+	if st.Tools == nil {
+		st.Tools = map[string]map[string]SkillState{}
 	}
 	return &st, nil
 }

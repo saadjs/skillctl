@@ -500,18 +500,70 @@ func TestSyncUpdatesStateFile(t *testing.T) {
 	if st.LastSync == "" {
 		t.Error("expected last_sync to be set")
 	}
-	if _, ok := st.Skills["alpha"]; !ok {
-		t.Error("expected alpha in state")
+	agentsState, ok := st.Tools["agents"]
+	if !ok {
+		t.Fatal("expected agents tool in state")
 	}
-	if _, ok := st.Skills["beta"]; !ok {
-		t.Error("expected beta in state")
+	if _, ok := agentsState["alpha"]; !ok {
+		t.Error("expected alpha in agents state")
 	}
-	for name, ss := range st.Skills {
+	if _, ok := agentsState["beta"]; !ok {
+		t.Error("expected beta in agents state")
+	}
+	for name, ss := range agentsState {
 		if !strings.HasPrefix(ss.Checksum, "sha256:") {
 			t.Errorf("skill %s checksum should start with sha256:, got %q", name, ss.Checksum)
 		}
 		if ss.SyncedAt == "" {
 			t.Errorf("skill %s synced_at should be set", name)
 		}
+	}
+}
+
+func TestSyncNewToolGetsSkillsAlreadySyncedElsewhere(t *testing.T) {
+	sourceDir, destDirs, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	// First sync: only to agents
+	cfg := &config.Config{Source: sourceDir, Tools: []string{"agents"}}
+	if err := config.SaveConfig(config.ConfigPath(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOutput, _ := captureOutput(t)
+	if err := runSync(&syncOptions{yes: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	agentsDest := destDirs[paths.ToolAgents]
+	if _, err := os.Stat(filepath.Join(agentsDest, "alpha", "SKILL.md")); err != nil {
+		t.Fatal("expected alpha synced to agents")
+	}
+
+	// Now add claude as a tool and sync again (without --all).
+	// Skills are unchanged but claude has never received them.
+	cfg.Tools = []string{"agents", "claude"}
+	if err := config.SaveConfig(config.ConfigPath(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOutput, _ = captureOutput(t)
+	if err := runSync(&syncOptions{yes: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	claudeDest := destDirs[paths.ToolClaude]
+	if _, err := os.Stat(filepath.Join(claudeDest, "alpha", "SKILL.md")); err != nil {
+		t.Error("expected alpha synced to newly added claude tool")
+	}
+	if _, err := os.Stat(filepath.Join(claudeDest, "beta", "SKILL.md")); err != nil {
+		t.Error("expected beta synced to newly added claude tool")
 	}
 }

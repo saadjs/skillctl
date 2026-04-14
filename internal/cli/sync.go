@@ -171,10 +171,13 @@ func runSync(opts *syncOptions) error {
 
 		result := syncResult{tool: string(tool), dest: dest}
 
+		toolKey := string(tool)
+		toolState := st.Tools[toolKey]
+
 		if opts.dryRun {
 			for _, skill := range selected {
 				cs := checksums[skill.Name]
-				prev, hasPrev := st.Skills[skill.Name]
+				prev, hasPrev := toolState[skill.Name]
 				if !opts.all && hasPrev && prev.Checksum == cs {
 					result.skipped = append(result.skipped, skill.Name)
 				} else {
@@ -191,7 +194,7 @@ func runSync(opts *syncOptions) error {
 
 		for _, skill := range selected {
 			cs := checksums[skill.Name]
-			prev, hasPrev := st.Skills[skill.Name]
+			prev, hasPrev := toolState[skill.Name]
 			if !opts.all && hasPrev && prev.Checksum == cs {
 				result.skipped = append(result.skipped, skill.Name)
 				continue
@@ -205,22 +208,25 @@ func runSync(opts *syncOptions) error {
 	}
 
 	if !opts.dryRun {
-		// Only update state for skills that were actually synced to at least one tool.
-		syncedSkills := map[string]bool{}
+		anySynced := false
+		now := config.NowTimestamp()
 		for _, r := range results {
-			for _, name := range r.synced {
-				syncedSkills[name] = true
+			if len(r.synced) == 0 {
+				continue
 			}
-		}
-		if len(syncedSkills) > 0 {
-			now := config.NowTimestamp()
-			st.LastSync = now
-			for name := range syncedSkills {
-				st.Skills[name] = config.SkillState{
+			anySynced = true
+			if st.Tools[r.tool] == nil {
+				st.Tools[r.tool] = map[string]config.SkillState{}
+			}
+			for _, name := range r.synced {
+				st.Tools[r.tool][name] = config.SkillState{
 					Checksum: checksums[name],
 					SyncedAt: now,
 				}
 			}
+		}
+		if anySynced {
+			st.LastSync = now
 			if err := config.SaveState(statePath, st); err != nil {
 				return fmt.Errorf("saving state: %w", err)
 			}
