@@ -40,14 +40,18 @@ func TestLoadSaveStateRoundTrip(t *testing.T) {
 
 	want := &State{
 		LastSync: "2026-04-13T10:00:00Z",
-		Skills: map[string]SkillState{
-			"code-rules": {
-				Checksum: "sha256:abc123",
-				SyncedAt: "2026-04-13T10:00:00Z",
+		Tools: map[string]map[string]SkillState{
+			"claude": {
+				"code-rules": {
+					Checksum: "sha256:abc123",
+					SyncedAt: "2026-04-13T10:00:00Z",
+				},
 			},
-			"de-ai-writing": {
-				Checksum: "sha256:def456",
-				SyncedAt: "2026-04-13T09:00:00Z",
+			"agents": {
+				"de-ai-writing": {
+					Checksum: "sha256:def456",
+					SyncedAt: "2026-04-13T09:00:00Z",
+				},
 			},
 		},
 	}
@@ -61,20 +65,27 @@ func TestLoadSaveStateRoundTrip(t *testing.T) {
 	if got.LastSync != want.LastSync {
 		t.Errorf("LastSync = %q, want %q", got.LastSync, want.LastSync)
 	}
-	if len(got.Skills) != len(want.Skills) {
-		t.Fatalf("Skills len = %d, want %d", len(got.Skills), len(want.Skills))
+	if len(got.Tools) != len(want.Tools) {
+		t.Fatalf("Tools len = %d, want %d", len(got.Tools), len(want.Tools))
 	}
-	for name, ws := range want.Skills {
-		gs, ok := got.Skills[name]
+	for toolName, wantSkills := range want.Tools {
+		gotSkills, ok := got.Tools[toolName]
 		if !ok {
-			t.Errorf("missing skill %q", name)
+			t.Errorf("missing tool %q", toolName)
 			continue
 		}
-		if gs.Checksum != ws.Checksum {
-			t.Errorf("skill %q checksum = %q, want %q", name, gs.Checksum, ws.Checksum)
-		}
-		if gs.SyncedAt != ws.SyncedAt {
-			t.Errorf("skill %q synced_at = %q, want %q", name, gs.SyncedAt, ws.SyncedAt)
+		for name, ws := range wantSkills {
+			gs, ok := gotSkills[name]
+			if !ok {
+				t.Errorf("tool %q missing skill %q", toolName, name)
+				continue
+			}
+			if gs.Checksum != ws.Checksum {
+				t.Errorf("tool %q skill %q checksum = %q, want %q", toolName, name, gs.Checksum, ws.Checksum)
+			}
+			if gs.SyncedAt != ws.SyncedAt {
+				t.Errorf("tool %q skill %q synced_at = %q, want %q", toolName, name, gs.SyncedAt, ws.SyncedAt)
+			}
 		}
 	}
 }
@@ -84,11 +95,11 @@ func TestLoadStateMissingFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error for missing state, got: %v", err)
 	}
-	if st.Skills == nil {
-		t.Error("Skills map should be initialized, got nil")
+	if st.Tools == nil {
+		t.Error("Tools map should be initialized, got nil")
 	}
-	if len(st.Skills) != 0 {
-		t.Errorf("Skills should be empty, got %d", len(st.Skills))
+	if len(st.Tools) != 0 {
+		t.Errorf("Tools should be empty, got %d", len(st.Tools))
 	}
 }
 
