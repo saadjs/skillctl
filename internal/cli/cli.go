@@ -23,6 +23,7 @@ func Execute(args []string) {
 		newAddCommand(),
 		newListCommand(),
 		newRemoveCommand(),
+		newSyncCommand(),
 	}
 	if len(args) > 0 {
 		switch args[0] {
