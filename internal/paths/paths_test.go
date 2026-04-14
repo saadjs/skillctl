@@ -23,7 +23,7 @@ func TestResolvePaths(t *testing.T) {
 		{ToolAgents, ScopeProject, filepath.Join(cwd, ".agents", "skills")},
 		{ToolCodex, ScopeGlobal, filepath.Join(home, ".codex", "skills")},
 		{ToolCodex, ScopeProject, filepath.Join(cwd, ".codex", "skills")},
-		{ToolClaude, ScopeGlobal, filepath.Join(home, ".claude", "skill")},
+		{ToolClaude, ScopeGlobal, filepath.Join(home, ".claude", "skills")},
 		{ToolClaude, ScopeProject, filepath.Join(cwd, ".claude", "skills")},
 		{ToolCursor, ScopeGlobal, filepath.Join(home, ".cursor", "skills")},
 		{ToolCursor, ScopeProject, filepath.Join(cwd, ".cursor", "skills")},
