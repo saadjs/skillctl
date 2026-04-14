@@ -99,6 +99,19 @@ func SaveState(path string, st *State) error {
 	return os.WriteFile(path, data, 0o600)
 }
 
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
 // ChecksumSkill computes a deterministic SHA256 checksum of all files in a
 // skill directory. Files are sorted by relative path, each file's content is
 // hashed individually, and then "relPath:hex\n" entries are combined into a
@@ -128,16 +141,11 @@ func ChecksumSkill(skillPath string) (string, error) {
 		if err != nil {
 			return err
 		}
-		f, err := os.Open(path)
+		hex, err := hashFile(path)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
-			return err
-		}
-		entries = append(entries, entry{rel: filepath.ToSlash(rel), hash: fmt.Sprintf("%x", h.Sum(nil))})
+		entries = append(entries, entry{rel: filepath.ToSlash(rel), hash: hex})
 		return nil
 	})
 	if err != nil {

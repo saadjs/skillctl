@@ -64,7 +64,12 @@ func runSync(opts *syncOptions) error {
 
 	cfg, err := loadOrCreateConfig(cfgPath, opts.yes)
 	if err != nil {
-		return err
+		// If both --source and --tool are provided, config is not required.
+		if opts.source != "" && len(opts.tools.values) > 0 {
+			cfg = &config.Config{}
+		} else {
+			return err
+		}
 	}
 
 	source := cfg.Source

@@ -367,6 +367,33 @@ func TestSyncYesWithoutConfigErrors(t *testing.T) {
 	}
 }
 
+func TestSyncYesWithSourceAndToolFlagsSucceeds(t *testing.T) {
+	sourceDir, destDirs, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	// No config file exists, but --source and --tool are provided
+	restoreOutput, _ := captureOutput(t)
+	opts := &syncOptions{
+		yes:    true,
+		all:    true,
+		source: sourceDir,
+		tools:  multiString{values: []string{"agents"}},
+	}
+	if err := runSync(opts); err != nil {
+		restoreOutput()
+		t.Fatalf("expected success with --source and --tool flags, got: %v", err)
+	}
+	restoreOutput()
+
+	agentsDest := destDirs[paths.ToolAgents]
+	if _, err := os.Stat(filepath.Join(agentsDest, "alpha", "SKILL.md")); err != nil {
+		t.Error("expected alpha synced to agents with flag overrides")
+	}
+}
+
 func TestSyncSourceFlagOverridesConfig(t *testing.T) {
 	_, destDirs, cleanup := setupSyncTest(t)
 	defer cleanup()
