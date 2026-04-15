@@ -337,6 +337,47 @@ func TestSyncSecurityScanBlocks(t *testing.T) {
 	}
 }
 
+func TestSyncFilteredIgnoresFindingsInUnselectedSkills(t *testing.T) {
+	sourceDir, destDirs, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	// Only the beta skill path has a finding; alpha is clean.
+	scanRepo = func(root string) (security.Report, error) {
+		if strings.Contains(filepath.ToSlash(root), "/beta") {
+			return security.Report{
+				Findings: []security.Finding{
+					{RuleID: "test", Severity: security.SeverityHigh, Message: "bad"},
+				},
+			}, nil
+		}
+		return security.Report{}, nil
+	}
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	cfg := &config.Config{Source: sourceDir, Tools: []string{"agents"}}
+	if err := config.SaveConfig(config.ConfigPath(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOutput, _ := captureOutput(t)
+	opts := &syncOptions{yes: true, all: true, skills: multiString{values: []string{"alpha"}}}
+	err := runSync(opts)
+	restoreOutput()
+	if err != nil {
+		t.Fatalf("runSync: %v", err)
+	}
+
+	agentsDest := destDirs[paths.ToolAgents]
+	if _, err := os.Stat(filepath.Join(agentsDest, "alpha", "SKILL.md")); err != nil {
+		t.Errorf("expected alpha copied when unrelated skill has findings: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(agentsDest, "beta")); err == nil {
+		t.Error("beta should not be copied since it was not selected")
+	}
+}
+
 func TestSyncMissingSourceDir(t *testing.T) {
 	cfgDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgDir)

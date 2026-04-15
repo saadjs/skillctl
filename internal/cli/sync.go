@@ -11,6 +11,7 @@ import (
 	"github.com/saadjs/agent-skills/internal/config"
 	"github.com/saadjs/agent-skills/internal/paths"
 	"github.com/saadjs/agent-skills/internal/prompts"
+	"github.com/saadjs/agent-skills/internal/security"
 	"github.com/saadjs/agent-skills/internal/skills"
 	"github.com/saadjs/agent-skills/internal/utils"
 )
@@ -121,7 +122,7 @@ func runSync(opts *syncOptions) error {
 		}
 	}
 
-	report, err := scanRepo(source)
+	report, err := scanSelectedSkills(selected)
 	if err != nil {
 		return fmt.Errorf("security scan failed: %w", err)
 	}
@@ -344,6 +345,26 @@ func parseToolList(names []string) ([]paths.Tool, error) {
 		tools = append(tools, tool)
 	}
 	return tools, nil
+}
+
+func scanSelectedSkills(selected []skills.Skill) (security.Report, error) {
+	merged := security.Report{SkipReasons: map[string]int{}}
+	for _, skill := range selected {
+		r, err := scanRepo(skill.Path)
+		if err != nil {
+			return security.Report{}, err
+		}
+		for _, f := range r.Findings {
+			f.Path = filepath.ToSlash(filepath.Join(skill.Name, f.Path))
+			merged.Findings = append(merged.Findings, f)
+		}
+		merged.FilesScanned += r.FilesScanned
+		merged.FilesSkipped += r.FilesSkipped
+		for k, v := range r.SkipReasons {
+			merged.SkipReasons[k] += v
+		}
+	}
+	return merged, nil
 }
 
 func printSyncSummary(results []syncResult, dryRun bool) {
