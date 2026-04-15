@@ -147,7 +147,7 @@ func runSync(opts *syncOptions) error {
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return fmt.Errorf("getting working directory: %w", err)
 	}
 
 	var results []syncResult
@@ -162,7 +162,7 @@ func runSync(opts *syncOptions) error {
 		parentInfo, parentErr := os.Stat(parent)
 		if parentErr != nil {
 			if os.IsNotExist(parentErr) {
-				utils.PrintInfo("Skipping %s: %s does not exist (tool not installed?)", tool, parent)
+				utils.PrintWarn("Skipping %s: %s does not exist (tool not installed?)", tool, parent)
 			} else {
 				utils.PrintWarn("Skipping %s: cannot access %s: %v", tool, parent, parentErr)
 			}
@@ -211,14 +211,14 @@ func runSync(opts *syncOptions) error {
 		results = append(results, result)
 	}
 
-	if !opts.dryRun {
-		anySynced := false
+	if !opts.dryRun && len(results) > 0 {
 		now := config.NowTimestamp()
+		skillFiltered := len(opts.skills.values) > 0
+		selectedNames := map[string]bool{}
+		for _, s := range selected {
+			selectedNames[s.Name] = true
+		}
 		for _, r := range results {
-			if len(r.synced) == 0 {
-				continue
-			}
-			anySynced = true
 			if st.Tools[r.tool] == nil {
 				st.Tools[r.tool] = map[string]config.SkillState{}
 			}
@@ -228,12 +228,17 @@ func runSync(opts *syncOptions) error {
 					SyncedAt: now,
 				}
 			}
-		}
-		if anySynced {
-			st.LastSync = now
-			if err := config.SaveState(statePath, st); err != nil {
-				return fmt.Errorf("saving state: %w", err)
+			if !skillFiltered {
+				for name := range st.Tools[r.tool] {
+					if !selectedNames[name] {
+						delete(st.Tools[r.tool], name)
+					}
+				}
 			}
+		}
+		st.LastSync = now
+		if err := config.SaveState(statePath, st); err != nil {
+			return fmt.Errorf("saving state: %w", err)
 		}
 	}
 

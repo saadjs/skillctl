@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/saadjs/agent-skills/internal/config"
 	"github.com/saadjs/agent-skills/internal/paths"
@@ -763,5 +764,127 @@ func TestSyncNewToolGetsSkillsAlreadySyncedElsewhere(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(claudeDest, "beta", "SKILL.md")); err != nil {
 		t.Error("expected beta synced to newly added claude tool")
+	}
+}
+
+func TestSyncRemovesStaleStateEntries(t *testing.T) {
+	sourceDir, _, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	cfg := &config.Config{Source: sourceDir, Tools: []string{"agents"}}
+	if err := config.SaveConfig(config.ConfigPath(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOutput, _ := captureOutput(t)
+	if err := runSync(&syncOptions{yes: true, all: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	// Remove beta from source and re-sync.
+	if err := os.RemoveAll(filepath.Join(sourceDir, "beta")); err != nil {
+		t.Fatal(err)
+	}
+	restoreOutput, _ = captureOutput(t)
+	if err := runSync(&syncOptions{yes: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	st, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := st.Tools["agents"]["beta"]; ok {
+		t.Error("expected beta removed from state after source deletion")
+	}
+	if _, ok := st.Tools["agents"]["alpha"]; !ok {
+		t.Error("expected alpha to remain in state")
+	}
+}
+
+func TestSyncSkillFilterPreservesOtherStateEntries(t *testing.T) {
+	sourceDir, _, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	cfg := &config.Config{Source: sourceDir, Tools: []string{"agents"}}
+	if err := config.SaveConfig(config.ConfigPath(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOutput, _ := captureOutput(t)
+	if err := runSync(&syncOptions{yes: true, all: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	// Re-sync only alpha; beta entry must not be purged.
+	restoreOutput, _ = captureOutput(t)
+	opts := &syncOptions{yes: true, all: true, skills: multiString{values: []string{"alpha"}}}
+	if err := runSync(opts); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	st, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := st.Tools["agents"]["beta"]; !ok {
+		t.Error("beta state should be preserved when --skill filter is used")
+	}
+}
+
+func TestSyncUpdatesLastSyncWhenUnchanged(t *testing.T) {
+	sourceDir, _, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	cfg := &config.Config{Source: sourceDir, Tools: []string{"agents"}}
+	if err := config.SaveConfig(config.ConfigPath(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOutput, _ := captureOutput(t)
+	if err := runSync(&syncOptions{yes: true, all: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	first, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure RFC3339-second granularity produces a different timestamp.
+	time.Sleep(1100 * time.Millisecond)
+
+	restoreOutput, _ = captureOutput(t)
+	if err := runSync(&syncOptions{yes: true}); err != nil {
+		restoreOutput()
+		t.Fatal(err)
+	}
+	restoreOutput()
+
+	second, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.LastSync == "" || second.LastSync == first.LastSync {
+		t.Errorf("last_sync should advance on no-op sync; first=%q second=%q", first.LastSync, second.LastSync)
 	}
 }
