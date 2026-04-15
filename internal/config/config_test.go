@@ -181,6 +181,55 @@ func TestChecksumChangesOnNewFile(t *testing.T) {
 	}
 }
 
+func TestChecksumChangesOnModeChange(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "my-skill")
+	must(t, os.MkdirAll(filepath.Join(skillDir, "scripts"), 0o755))
+	script := filepath.Join(skillDir, "scripts", "run.sh")
+	writeFile(t, script, "#!/bin/bash\necho hi")
+	must(t, os.Chmod(script, 0o644))
+
+	c1, err := ChecksumSkill(skillDir)
+	if err != nil {
+		t.Fatalf("ChecksumSkill: %v", err)
+	}
+
+	must(t, os.Chmod(script, 0o755))
+
+	c2, err := ChecksumSkill(skillDir)
+	if err != nil {
+		t.Fatalf("ChecksumSkill: %v", err)
+	}
+	if c1 == c2 {
+		t.Error("checksum should change when file mode changes (e.g. chmod +x)")
+	}
+}
+
+func TestChecksumChangesOnSymlinkRetarget(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "my-skill")
+	must(t, os.MkdirAll(skillDir, 0o755))
+	writeFile(t, filepath.Join(skillDir, "SKILL.md"), "content")
+	link := filepath.Join(skillDir, "ref")
+	must(t, os.Symlink("a.md", link))
+
+	c1, err := ChecksumSkill(skillDir)
+	if err != nil {
+		t.Fatalf("ChecksumSkill: %v", err)
+	}
+
+	must(t, os.Remove(link))
+	must(t, os.Symlink("b.md", link))
+
+	c2, err := ChecksumSkill(skillDir)
+	if err != nil {
+		t.Fatalf("ChecksumSkill: %v", err)
+	}
+	if c1 == c2 {
+		t.Error("checksum should change when a symlink retargets")
+	}
+}
+
 func TestDirRespectsXDG(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
 	got := Dir()

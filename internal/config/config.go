@@ -119,7 +119,7 @@ func hashFile(path string) (string, error) {
 func ChecksumSkill(skillPath string) (string, error) {
 	type entry struct {
 		rel  string
-		hash string
+		line string
 	}
 	var entries []entry
 
@@ -127,25 +127,44 @@ func ChecksumSkill(skillPath string) (string, error) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		if path == skillPath {
 			return nil
 		}
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() {
-			return nil
-		}
 		rel, err := filepath.Rel(skillPath, path)
 		if err != nil {
 			return err
 		}
-		hex, err := hashFile(path)
-		if err != nil {
-			return err
+		relSlash := filepath.ToSlash(rel)
+		mode := info.Mode()
+		switch {
+		case mode&os.ModeSymlink != 0:
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, entry{
+				rel:  relSlash,
+				line: fmt.Sprintf("%s:symlink:%o:%s", relSlash, mode.Perm(), filepath.ToSlash(target)),
+			})
+		case mode.IsDir():
+			entries = append(entries, entry{
+				rel:  relSlash,
+				line: fmt.Sprintf("%s:dir:%o", relSlash, mode.Perm()),
+			})
+		case mode.IsRegular():
+			hex, err := hashFile(path)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, entry{
+				rel:  relSlash,
+				line: fmt.Sprintf("%s:file:%o:%s", relSlash, mode.Perm(), hex),
+			})
 		}
-		entries = append(entries, entry{rel: filepath.ToSlash(rel), hash: hex})
 		return nil
 	})
 	if err != nil {
@@ -156,7 +175,7 @@ func ChecksumSkill(skillPath string) (string, error) {
 
 	combined := sha256.New()
 	for _, e := range entries {
-		fmt.Fprintf(combined, "%s:%s\n", e.rel, e.hash)
+		fmt.Fprintf(combined, "%s\n", e.line)
 	}
 	return fmt.Sprintf("sha256:%x", combined.Sum(nil)), nil
 }
