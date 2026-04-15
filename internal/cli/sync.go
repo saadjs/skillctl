@@ -62,16 +62,12 @@ func runSync(opts *syncOptions) error {
 	cfgPath := config.ConfigPath()
 	statePath := config.StatePath()
 
-	var cfg *config.Config
-	if opts.source != "" && len(opts.tools.values) > 0 {
-		// Flags fully specify the sync; skip config load/bootstrap entirely.
-		cfg = &config.Config{}
-	} else {
-		loaded, err := loadOrCreateConfig(cfgPath, opts.yes)
-		if err != nil {
-			return err
-		}
-		cfg = loaded
+	cfg, err := loadOrCreateConfig(cfgPath, opts.yes, &config.Config{
+		Source: opts.source,
+		Tools:  append([]string(nil), opts.tools.values...),
+	})
+	if err != nil {
+		return err
 	}
 
 	source := cfg.Source
@@ -81,7 +77,7 @@ func runSync(opts *syncOptions) error {
 	if source == "" {
 		return errors.New("source directory is not configured; update config or use --source")
 	}
-	source, err := utils.ExpandHome(source)
+	source, err = utils.ExpandHome(source)
 	if err != nil {
 		return fmt.Errorf("expanding source path: %w", err)
 	}
@@ -244,7 +240,7 @@ func runSync(opts *syncOptions) error {
 	return nil
 }
 
-func loadOrCreateConfig(cfgPath string, yes bool) (*config.Config, error) {
+func loadOrCreateConfig(cfgPath string, yes bool, preset *config.Config) (*config.Config, error) {
 	cfg, err := config.LoadConfig(cfgPath)
 	if err == nil {
 		return cfg, nil
@@ -252,56 +248,90 @@ func loadOrCreateConfig(cfgPath string, yes bool) (*config.Config, error) {
 	if !os.IsNotExist(err) {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
+
+	cfg = &config.Config{}
+	if preset != nil {
+		cfg.Source = preset.Source
+		cfg.Tools = append(cfg.Tools, preset.Tools...)
+	}
+	if cfg.Source != "" {
+		absSource, err := normalizeBootstrapSource(cfg.Source)
+		if err != nil {
+			return nil, err
+		}
+		cfg.Source = absSource
+	}
+	if cfg.Source != "" && len(cfg.Tools) > 0 {
+		// Flags fully specify the sync; skip bootstrap and avoid creating config.yaml.
+		return cfg, nil
+	}
 	if yes {
-		return nil, fmt.Errorf("no config found at %s; run sync interactively first or create config manually", cfgPath)
+		switch {
+		case cfg.Source == "" && len(cfg.Tools) == 0:
+			return nil, fmt.Errorf("no config found at %s; run sync interactively first or create config manually", cfgPath)
+		case cfg.Source == "":
+			return nil, errors.New("source directory is not configured; update config or use --source")
+		default:
+			return nil, errors.New("no tools configured")
+		}
 	}
 
 	utils.PrintInfo("No config found. Let's set one up.")
 
-	sourceInput, err := prompts.AskInput("Source directory (where your skills live)")
-	if err != nil {
-		return nil, err
-	}
-	if sourceInput == "" {
-		return nil, errors.New("source directory is required")
-	}
-	expanded, err := utils.ExpandHome(sourceInput)
-	if err != nil {
-		return nil, fmt.Errorf("invalid source path: %w", err)
-	}
-	absSource, err := filepath.Abs(expanded)
-	if err != nil {
-		return nil, fmt.Errorf("resolving source path: %w", err)
-	}
-	expandedInfo, expandedErr := os.Stat(absSource)
-	if expandedErr != nil {
-		return nil, fmt.Errorf("source directory not accessible: %s: %v", sourceInput, expandedErr)
-	}
-	if !expandedInfo.IsDir() {
-		return nil, fmt.Errorf("source path is not a directory: %s", sourceInput)
+	if cfg.Source == "" {
+		sourceInput, err := prompts.AskInput("Source directory (where your skills live)")
+		if err != nil {
+			return nil, err
+		}
+		if sourceInput == "" {
+			return nil, errors.New("source directory is required")
+		}
+		absSource, err := normalizeBootstrapSource(sourceInput)
+		if err != nil {
+			return nil, err
+		}
+		cfg.Source = absSource
 	}
 
-	var toolOptions []string
-	for _, t := range paths.Tools() {
-		toolOptions = append(toolOptions, string(t))
-	}
-	toolSelections, err := prompts.AskMulti("Select tools to sync to", toolOptions)
-	if err != nil {
-		return nil, err
-	}
-	if len(toolSelections) == 0 {
-		return nil, errors.New("at least one tool is required")
+	if len(cfg.Tools) == 0 {
+		var toolOptions []string
+		for _, t := range paths.Tools() {
+			toolOptions = append(toolOptions, string(t))
+		}
+		toolSelections, err := prompts.AskMulti("Select tools to sync to", toolOptions)
+		if err != nil {
+			return nil, err
+		}
+		if len(toolSelections) == 0 {
+			return nil, errors.New("at least one tool is required")
+		}
+		cfg.Tools = toolSelections
 	}
 
-	cfg = &config.Config{
-		Source: absSource,
-		Tools:  toolSelections,
-	}
 	if err := config.SaveConfig(cfgPath, cfg); err != nil {
 		return nil, fmt.Errorf("saving config: %w", err)
 	}
 	utils.PrintInfo("Config saved to %s", cfgPath)
 	return cfg, nil
+}
+
+func normalizeBootstrapSource(sourceInput string) (string, error) {
+	expanded, err := utils.ExpandHome(sourceInput)
+	if err != nil {
+		return "", fmt.Errorf("invalid source path: %w", err)
+	}
+	absSource, err := filepath.Abs(expanded)
+	if err != nil {
+		return "", fmt.Errorf("resolving source path: %w", err)
+	}
+	expandedInfo, expandedErr := os.Stat(absSource)
+	if expandedErr != nil {
+		return "", fmt.Errorf("source directory not accessible: %s: %v", sourceInput, expandedErr)
+	}
+	if !expandedInfo.IsDir() {
+		return "", fmt.Errorf("source path is not a directory: %s", sourceInput)
+	}
+	return absSource, nil
 }
 
 func parseToolList(names []string) ([]paths.Tool, error) {

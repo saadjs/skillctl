@@ -426,6 +426,104 @@ func TestSyncSkipsBootstrapWhenFlagsProvided(t *testing.T) {
 	}
 }
 
+func TestSyncYesWithSourceFlagErrorsOnMissingTools(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	opts := &syncOptions{
+		yes:    true,
+		source: t.TempDir(),
+	}
+	err := runSync(opts)
+	if err == nil || !strings.Contains(err.Error(), "no tools configured") {
+		t.Fatalf("expected missing tools error, got: %v", err)
+	}
+}
+
+func TestSyncBootstrapUsesProvidedSourceWithoutReprompting(t *testing.T) {
+	sourceDir, destDirs, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	restoreInput := withStdin(t, "1\n")
+	defer restoreInput()
+
+	restoreOutput, output := captureOutput(t)
+	opts := &syncOptions{
+		all:    true,
+		source: sourceDir,
+	}
+	if err := runSync(opts); err != nil {
+		restoreOutput()
+		t.Fatalf("runSync: %v", err)
+	}
+	restoreOutput()
+
+	if strings.Contains(output.String(), "Source directory (where your skills live):") {
+		t.Fatalf("expected source prompt to be skipped, got output: %s", output.String())
+	}
+
+	cfg, err := config.LoadConfig(config.ConfigPath())
+	if err != nil {
+		t.Fatalf("expected config to be saved, got: %v", err)
+	}
+	if cfg.Source != sourceDir {
+		t.Fatalf("expected source %q in saved config, got %q", sourceDir, cfg.Source)
+	}
+	if len(cfg.Tools) != 1 || cfg.Tools[0] != "agents" {
+		t.Fatalf("expected agents tool in saved config, got: %v", cfg.Tools)
+	}
+
+	agentsDest := destDirs[paths.ToolAgents]
+	if _, err := os.Stat(filepath.Join(agentsDest, "alpha", "SKILL.md")); err != nil {
+		t.Error("expected alpha synced via provided source and prompted tool")
+	}
+}
+
+func TestSyncBootstrapUsesProvidedToolWithoutReprompting(t *testing.T) {
+	sourceDir, destDirs, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	restoreInput := withStdin(t, sourceDir+"\n")
+	defer restoreInput()
+
+	restoreOutput, output := captureOutput(t)
+	opts := &syncOptions{
+		all:   true,
+		tools: multiString{values: []string{"agents"}},
+	}
+	if err := runSync(opts); err != nil {
+		restoreOutput()
+		t.Fatalf("runSync: %v", err)
+	}
+	restoreOutput()
+
+	if strings.Contains(output.String(), "Select tools to sync to") {
+		t.Fatalf("expected tool prompt to be skipped, got output: %s", output.String())
+	}
+
+	cfg, err := config.LoadConfig(config.ConfigPath())
+	if err != nil {
+		t.Fatalf("expected config to be saved, got: %v", err)
+	}
+	if cfg.Source != sourceDir {
+		t.Fatalf("expected source %q in saved config, got %q", sourceDir, cfg.Source)
+	}
+	if len(cfg.Tools) != 1 || cfg.Tools[0] != "agents" {
+		t.Fatalf("expected agents tool in saved config, got: %v", cfg.Tools)
+	}
+
+	agentsDest := destDirs[paths.ToolAgents]
+	if _, err := os.Stat(filepath.Join(agentsDest, "alpha", "SKILL.md")); err != nil {
+		t.Error("expected alpha synced via prompted source and provided tool")
+	}
+}
+
 func TestSyncSourceFlagOverridesConfig(t *testing.T) {
 	_, destDirs, cleanup := setupSyncTest(t)
 	defer cleanup()
