@@ -71,7 +71,7 @@ func Resolve(tool Tool, scope Scope, cwd string) (string, error) {
 		}
 	case ToolClaude:
 		if scope == ScopeGlobal {
-			path = "~/.claude/skill"
+			path = "~/.claude/skills"
 		} else {
 			path = "./.claude/skills"
 		}
