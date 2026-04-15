@@ -394,6 +394,38 @@ func TestSyncYesWithSourceAndToolFlagsSucceeds(t *testing.T) {
 	}
 }
 
+func TestSyncSkipsBootstrapWhenFlagsProvided(t *testing.T) {
+	sourceDir, destDirs, cleanup := setupSyncTest(t)
+	defer cleanup()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+
+	// No config file, no --yes flag. Before the fix, this would call
+	// loadOrCreateConfig and prompt for source/tools even though the user
+	// already supplied them, persisting the interactive answers to config.yaml.
+	opts := &syncOptions{
+		all:    true,
+		source: sourceDir,
+		tools:  multiString{values: []string{"agents"}},
+	}
+	restoreOutput, _ := captureOutput(t)
+	if err := runSync(opts); err != nil {
+		restoreOutput()
+		t.Fatalf("runSync: %v", err)
+	}
+	restoreOutput()
+
+	agentsDest := destDirs[paths.ToolAgents]
+	if _, err := os.Stat(filepath.Join(agentsDest, "alpha", "SKILL.md")); err != nil {
+		t.Error("expected alpha synced via flag overrides")
+	}
+	// The bootstrap flow must not run, so no config file should be auto-created.
+	if _, err := os.Stat(config.ConfigPath()); !os.IsNotExist(err) {
+		t.Errorf("config.yaml should not be created when flags fully specify the sync, err=%v", err)
+	}
+}
+
 func TestSyncSourceFlagOverridesConfig(t *testing.T) {
 	_, destDirs, cleanup := setupSyncTest(t)
 	defer cleanup()

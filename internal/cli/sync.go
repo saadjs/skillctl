@@ -62,14 +62,16 @@ func runSync(opts *syncOptions) error {
 	cfgPath := config.ConfigPath()
 	statePath := config.StatePath()
 
-	cfg, err := loadOrCreateConfig(cfgPath, opts.yes)
-	if err != nil {
-		// If both --source and --tool are provided, config is not required.
-		if opts.source != "" && len(opts.tools.values) > 0 {
-			cfg = &config.Config{}
-		} else {
+	var cfg *config.Config
+	if opts.source != "" && len(opts.tools.values) > 0 {
+		// Flags fully specify the sync; skip config load/bootstrap entirely.
+		cfg = &config.Config{}
+	} else {
+		loaded, err := loadOrCreateConfig(cfgPath, opts.yes)
+		if err != nil {
 			return err
 		}
+		cfg = loaded
 	}
 
 	source := cfg.Source
@@ -79,7 +81,7 @@ func runSync(opts *syncOptions) error {
 	if source == "" {
 		return errors.New("source directory is not configured; update config or use --source")
 	}
-	source, err = utils.ExpandHome(source)
+	source, err := utils.ExpandHome(source)
 	if err != nil {
 		return fmt.Errorf("expanding source path: %w", err)
 	}
@@ -267,7 +269,11 @@ func loadOrCreateConfig(cfgPath string, yes bool) (*config.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid source path: %w", err)
 	}
-	expandedInfo, expandedErr := os.Stat(expanded)
+	absSource, err := filepath.Abs(expanded)
+	if err != nil {
+		return nil, fmt.Errorf("resolving source path: %w", err)
+	}
+	expandedInfo, expandedErr := os.Stat(absSource)
 	if expandedErr != nil {
 		return nil, fmt.Errorf("source directory not accessible: %s: %v", sourceInput, expandedErr)
 	}
@@ -288,7 +294,7 @@ func loadOrCreateConfig(cfgPath string, yes bool) (*config.Config, error) {
 	}
 
 	cfg = &config.Config{
-		Source: sourceInput,
+		Source: absSource,
 		Tools:  toolSelections,
 	}
 	if err := config.SaveConfig(cfgPath, cfg); err != nil {
