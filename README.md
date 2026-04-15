@@ -35,7 +35,19 @@ skillctl add ./path/to/skills-repo --dest /tmp/skills
 skillctl add ./path/to/skills-repo --dest /tmp/skills --force
 skillctl list --tool agents --scope global
 skillctl remove --tool agents --scope project --skill de-dupe
+
+# Sync changed skills only (default)
+skillctl sync
+
+# Force re-sync of every selected skill, even if unchanged
+skillctl sync --all
 ```
+
+### Sync mode: `--all`
+
+`skillctl sync` is checksum-aware by default: it only copies skills that changed since the last sync for each configured tool.
+
+Use `skillctl sync --all` when you need a full refresh. It ignores stored checksums and re-copies every selected skill, which helps when local skill folders were manually edited, partially deleted, or drifted out of sync without source changes.
 
 ### Security Scan During Install
 
