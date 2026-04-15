@@ -24,8 +24,8 @@ type SkillState struct {
 }
 
 type State struct {
-	LastSync string                              `yaml:"last_sync"`
-	Tools    map[string]map[string]SkillState    `yaml:"tools"`
+	LastSync string                           `yaml:"last_sync"`
+	Tools    map[string]map[string]SkillState `yaml:"tools"`
 }
 
 func Dir() string {
