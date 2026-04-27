@@ -16,7 +16,7 @@ import (
 )
 
 type addOptions struct {
-	tool      string
+	tools     multiString
 	scope     string
 	dest      string
 	ref       string
@@ -35,7 +35,7 @@ var scanRepo = security.Scan
 func newAddCommand() *Command {
 	opts := &addOptions{}
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
-	fs.StringVar(&opts.tool, "tool", "", "Tool name (agents|codex|claude|cursor|windsurf|copilot)")
+	fs.Var(&opts.tools, "tool", "Tool name (repeatable: agents|codex|claude|cursor|windsurf|copilot)")
 	fs.StringVar(&opts.scope, "scope", "", "Scope (global|project)")
 	fs.StringVar(&opts.dest, "dest", "", "Destination path (overrides tool/scope)")
 	fs.StringVar(&opts.ref, "ref", "", "Git ref (branch, tag, or sha)")
@@ -60,7 +60,7 @@ func newAddCommand() *Command {
 			if opts.overwrite && opts.skip {
 				return errors.New("--overwrite and --skip cannot be used together")
 			}
-			dest, err := resolveDestination(opts.tool, opts.scope, opts.dest, opts.yes)
+			destinations, err := resolveAddDestinations(opts.tools.values, opts.scope, opts.dest, opts.yes)
 			if err != nil {
 				return err
 			}
@@ -138,82 +138,88 @@ func newAddCommand() *Command {
 				if !performScan {
 					utils.PrintInfo("Dry run: remote source was not cloned; security scan skipped.")
 				}
-				if _, err := os.Stat(dest); err != nil {
-					if os.IsNotExist(err) {
-						utils.PrintInfo("Dry run: would create destination directory %s", dest)
-					} else {
-						return err
-					}
-				}
-				utils.PrintInfo("Dry run: would install %d skill(s) to %s", len(selectedNames), dest)
-				for _, name := range selectedNames {
-					if exists(dest, name) {
-						if opts.overwrite {
-							utils.PrintInfo("Would overwrite %s", name)
-						} else if opts.skip {
-							utils.PrintInfo("Would skip %s", name)
+				for _, destination := range destinations {
+					dest := destination.path
+					if _, err := os.Stat(dest); err != nil {
+						if os.IsNotExist(err) {
+							utils.PrintInfo("Dry run: would create destination directory %s", dest)
 						} else {
-							utils.PrintInfo("Would prompt for %s (already exists)", name)
+							return err
 						}
-					} else {
-						utils.PrintInfo("Would install %s", name)
+					}
+					utils.PrintInfo("Dry run: would install %d skill(s) to %s", len(selectedNames), dest)
+					for _, name := range selectedNames {
+						if exists(dest, name) {
+							if opts.overwrite {
+								utils.PrintInfo("Would overwrite %s", name)
+							} else if opts.skip {
+								utils.PrintInfo("Would skip %s", name)
+							} else {
+								utils.PrintInfo("Would prompt for %s (already exists)", name)
+							}
+						} else {
+							utils.PrintInfo("Would install %s", name)
+						}
 					}
 				}
 				return nil
 			}
 
-			if err := utils.EnsureDir(dest); err != nil {
-				return err
-			}
 			if len(selected) == 0 {
 				return errors.New("no skills selected")
 			}
-			utils.PrintInfo("Installing %d skill(s) to %s", len(selected), dest)
-			mode := "ask"
-			if opts.overwrite {
-				mode = "overwrite"
-			}
-			if opts.skip {
-				mode = "skip"
-			}
-			for _, skill := range selected {
-				overwrite := mode == "overwrite"
-				skip := mode == "skip"
-				if !overwrite && !skip {
-					if exists(dest, skill.Name) {
-						choice, err := promptConflict(skill.Name)
-						if err != nil {
-							return err
-						}
-						switch choice {
-						case "overwrite":
-							overwrite = true
-						case "skip":
-							skip = true
-						case "overwrite-all":
-							overwrite = true
-							mode = "overwrite"
-						case "skip-all":
-							skip = true
-							mode = "skip"
-						case "cancel":
-							return errors.New("canceled")
-						}
-					}
-				}
-				if skip {
-					utils.PrintInfo("Skipping %s", skill.Name)
-					continue
-				}
-				err := skills.CopySkill(skill, dest, overwrite)
-				if errors.Is(err, os.ErrExist) {
-					utils.PrintWarn("Skill %s already exists", skill.Name)
-					continue
-				}
-				if err != nil {
+			for _, destination := range destinations {
+				dest := destination.path
+				if err := utils.EnsureDir(dest); err != nil {
 					return err
 				}
-				utils.PrintInfo("Installed %s", skill.Name)
+				utils.PrintInfo("Installing %d skill(s) to %s", len(selected), dest)
+				mode := "ask"
+				if opts.overwrite {
+					mode = "overwrite"
+				}
+				if opts.skip {
+					mode = "skip"
+				}
+				for _, skill := range selected {
+					overwrite := mode == "overwrite"
+					skip := mode == "skip"
+					if !overwrite && !skip {
+						if exists(dest, skill.Name) {
+							choice, err := promptConflict(skill.Name)
+							if err != nil {
+								return err
+							}
+							switch choice {
+							case "overwrite":
+								overwrite = true
+							case "skip":
+								skip = true
+							case "overwrite-all":
+								overwrite = true
+								mode = "overwrite"
+							case "skip-all":
+								skip = true
+								mode = "skip"
+							case "cancel":
+								return errors.New("canceled")
+							}
+						}
+					}
+					if skip {
+						utils.PrintInfo("Skipping %s", skill.Name)
+						continue
+					}
+					err := skills.CopySkill(skill, dest, overwrite)
+					if errors.Is(err, os.ErrExist) {
+						utils.PrintWarn("Skill %s already exists", skill.Name)
+						continue
+					}
+					if err != nil {
+						return err
+					}
+					utils.PrintInfo("Installed %s", skill.Name)
+				}
 			}
 			return nil
 		},

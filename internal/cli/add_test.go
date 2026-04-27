@@ -173,6 +173,113 @@ func TestAddRemoteDryRunRequiresSkill(t *testing.T) {
 	}
 }
 
+func TestAddRepeatableToolInstallsToEachResolvedDestination(t *testing.T) {
+	projectDir := t.TempDir()
+	t.Chdir(projectDir)
+
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		repoDir,
+		"--tool", "codex",
+		"--tool", "claude",
+		"--scope", "project",
+		"--skill", "alpha",
+		"--yes",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	for _, dest := range []string{
+		filepath.Join(projectDir, ".codex", "skills", "alpha", "SKILL.md"),
+		filepath.Join(projectDir, ".claude", "skills", "alpha", "SKILL.md"),
+	} {
+		if _, err := os.Stat(dest); err != nil {
+			t.Fatalf("expected skill installed at %s: %v", dest, err)
+		}
+	}
+}
+
+func TestAddRejectsDestWithTool(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		repoDir,
+		"--dest", filepath.Join(t.TempDir(), "dest"),
+		"--tool", "codex",
+		"--scope", "project",
+		"--skill", "alpha",
+		"--yes",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil || !strings.Contains(err.Error(), "--dest cannot be combined with --tool") {
+		t.Fatalf("expected --dest/--tool error, got: %v", err)
+	}
+}
+
+func TestAddRepeatableToolDryRunPreviewsEachDestination(t *testing.T) {
+	projectDir := t.TempDir()
+	t.Chdir(projectDir)
+
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+
+	restoreOutput, output := captureOutput(t)
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		repoDir,
+		"--tool", "codex",
+		"--tool", "claude",
+		"--scope", "project",
+		"--skill", "alpha",
+		"--dry-run",
+		"--yes",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	restoreOutput()
+
+	codexDest := filepath.Join(projectDir, ".codex", "skills")
+	claudeDest := filepath.Join(projectDir, ".claude", "skills")
+	out := output.String()
+	if !strings.Contains(out, "Dry run: would install 1 skill(s) to "+codexDest) {
+		t.Fatalf("expected codex dry-run destination, got: %s", out)
+	}
+	if !strings.Contains(out, "Dry run: would install 1 skill(s) to "+claudeDest) {
+		t.Fatalf("expected claude dry-run destination, got: %s", out)
+	}
+	for _, path := range []string{
+		filepath.Join(projectDir, ".codex"),
+		filepath.Join(projectDir, ".claude"),
+	} {
+		if _, err := os.Stat(path); err == nil || !os.IsNotExist(err) {
+			t.Fatalf("expected dry-run not to create %s", path)
+		}
+	}
+}
+
 func TestAddRemoteCloneIsCleanedUpOnSecurityBlock(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "dest")
 	cloneBase := filepath.Join(t.TempDir(), "clone")

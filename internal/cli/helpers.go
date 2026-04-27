@@ -11,6 +11,10 @@ import (
 	"github.com/saadjs/skillctl/internal/utils"
 )
 
+type addDestination struct {
+	path string
+}
+
 func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string, error) {
 	if destFlag != "" {
 		return expandDest(destFlag)
@@ -75,6 +79,56 @@ func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string,
 		return "", err
 	}
 	return paths.Resolve(tool, scope, cwd)
+}
+
+func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes bool) ([]addDestination, error) {
+	if len(toolFlags) == 0 {
+		dest, err := resolveDestination("", scopeFlag, destFlag, yes)
+		if err != nil {
+			return nil, err
+		}
+		return []addDestination{{path: dest}}, nil
+	}
+	if destFlag != "" {
+		return nil, fmt.Errorf("--dest cannot be combined with --tool")
+	}
+
+	var scope paths.Scope
+	var err error
+	if scopeFlag != "" {
+		scope, err = paths.ParseScope(scopeFlag)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if scope == "" {
+		if yes {
+			return nil, fmt.Errorf("--yes requires --scope when --tool is used")
+		}
+		selection, err := prompts.AskSelect("Select scope", []string{"global", "project"})
+		if err != nil {
+			return nil, err
+		}
+		scope, _ = paths.ParseScope(selection)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	destinations := make([]addDestination, 0, len(toolFlags))
+	for _, toolFlag := range toolFlags {
+		tool, err := paths.ParseTool(toolFlag)
+		if err != nil {
+			return nil, err
+		}
+		dest, err := paths.Resolve(tool, scope, cwd)
+		if err != nil {
+			return nil, err
+		}
+		destinations = append(destinations, addDestination{path: dest})
+	}
+	return destinations, nil
 }
 
 func expandDest(dest string) (string, error) {

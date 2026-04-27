@@ -32,6 +32,7 @@ skillctl add saadjs/agent-stuff --tool agents --scope project
 
 # Or install to tool-specific directories
 skillctl add saadjs/agent-stuff --tool codex --scope global
+skillctl add saadjs/agent-stuff --tool codex --tool claude --scope global
 skillctl add saadjs/agent-stuff --tool cursor --scope project
 skillctl add saadjs/agent-stuff --tool claude --scope project
 skillctl add ./path/to/skills-repo --dest /tmp/skills
