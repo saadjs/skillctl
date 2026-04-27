@@ -79,7 +79,7 @@ func newAddCommand() *Command {
 					return errors.New("--ref is not supported for local paths")
 				}
 			} else {
-				repo, err := utils.NormalizeRepo(source)
+				repoURL, err := utils.CloneURL(source)
 				if err != nil {
 					return err
 				}
@@ -90,7 +90,6 @@ func newAddCommand() *Command {
 					}
 					selectedNames = append(selectedNames, opts.skills.values...)
 				} else {
-					repoURL := utils.RepoURL(repo)
 					repoPath, err = cloneRepo(repoURL, opts.ref)
 					if err != nil {
 						return err

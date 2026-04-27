@@ -27,6 +27,28 @@ func TestNormalizeRepo(t *testing.T) {
 	}
 }
 
+func TestCloneURL(t *testing.T) {
+	cases := map[string]string{
+		"saadjs/skillctl":                        "https://github.com/saadjs/skillctl.git",
+		"https://github.com/saadjs/skillctl":     "https://github.com/saadjs/skillctl.git",
+		"https://github.com/saadjs/skillctl.git": "https://github.com/saadjs/skillctl.git",
+		"git@github.com:saadjs/skillctl":         "git@github.com:saadjs/skillctl.git",
+		"git@github.com:saadjs/skillctl.git":     "git@github.com:saadjs/skillctl.git",
+	}
+	for input, expected := range cases {
+		got, err := CloneURL(input)
+		if err != nil {
+			t.Fatalf("unexpected error for %s: %v", input, err)
+		}
+		if got != expected {
+			t.Fatalf("expected %s, got %s", expected, got)
+		}
+	}
+	if _, err := CloneURL("not-a-repo"); err == nil {
+		t.Fatalf("expected error for invalid repo")
+	}
+}
+
 func TestResolveLocalPath(t *testing.T) {
 	dir := t.TempDir()
 	got, ok, err := ResolveLocalPath(dir)
