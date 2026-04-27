@@ -8,10 +8,10 @@ import (
 
 func TestNormalizeRepo(t *testing.T) {
 	cases := map[string]string{
-		"saadjs/agent-skills":                        "saadjs/agent-skills",
-		"https://github.com/saadjs/agent-skills":     "saadjs/agent-skills",
-		"https://github.com/saadjs/agent-skills.git": "saadjs/agent-skills",
-		"git@github.com:saadjs/agent-skills.git":     "saadjs/agent-skills",
+		"saadjs/skillctl":                        "saadjs/skillctl",
+		"https://github.com/saadjs/skillctl":     "saadjs/skillctl",
+		"https://github.com/saadjs/skillctl.git": "saadjs/skillctl",
+		"git@github.com:saadjs/skillctl.git":     "saadjs/skillctl",
 	}
 	for input, expected := range cases {
 		got, err := NormalizeRepo(input)

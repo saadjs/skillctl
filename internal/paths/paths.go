@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/saadjs/agent-skills/internal/utils"
+	"github.com/saadjs/skillctl/internal/utils"
 )
 
 type Tool string

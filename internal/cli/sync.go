@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/saadjs/agent-skills/internal/config"
-	"github.com/saadjs/agent-skills/internal/paths"
-	"github.com/saadjs/agent-skills/internal/prompts"
-	"github.com/saadjs/agent-skills/internal/security"
-	"github.com/saadjs/agent-skills/internal/skills"
-	"github.com/saadjs/agent-skills/internal/utils"
+	"github.com/saadjs/skillctl/internal/config"
+	"github.com/saadjs/skillctl/internal/paths"
+	"github.com/saadjs/skillctl/internal/prompts"
+	"github.com/saadjs/skillctl/internal/security"
+	"github.com/saadjs/skillctl/internal/skills"
+	"github.com/saadjs/skillctl/internal/utils"
 )
 
 type syncOptions struct {

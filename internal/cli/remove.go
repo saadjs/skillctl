@@ -5,8 +5,8 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/saadjs/agent-skills/internal/prompts"
-	"github.com/saadjs/agent-skills/internal/skills"
+	"github.com/saadjs/skillctl/internal/prompts"
+	"github.com/saadjs/skillctl/internal/skills"
 )
 
 type removeOptions struct {

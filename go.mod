@@ -1,4 +1,4 @@
-module github.com/saadjs/agent-skills
+module github.com/saadjs/skillctl
 
 go 1.20
 

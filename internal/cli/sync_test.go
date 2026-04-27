@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/saadjs/agent-skills/internal/config"
-	"github.com/saadjs/agent-skills/internal/paths"
-	"github.com/saadjs/agent-skills/internal/security"
+	"github.com/saadjs/skillctl/internal/config"
+	"github.com/saadjs/skillctl/internal/paths"
+	"github.com/saadjs/skillctl/internal/security"
 )
 
 func setupSyncTest(t *testing.T) (sourceDir string, destDirs map[paths.Tool]string, cleanup func()) {

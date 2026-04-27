@@ -1,5 +1,5 @@
 {
-  "name": "agent-skills",
+  "name": "skillctl",
   "version": "1.0.0",
   "description": "Agent Skills",
   "scripts": {

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/saadjs/agent-skills/internal/cli"
+	"github.com/saadjs/skillctl/internal/cli"
 )
 
 func main() {

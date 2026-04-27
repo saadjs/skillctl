@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/saadjs/agent-skills/internal/paths"
-	"github.com/saadjs/agent-skills/internal/prompts"
-	"github.com/saadjs/agent-skills/internal/utils"
+	"github.com/saadjs/skillctl/internal/paths"
+	"github.com/saadjs/skillctl/internal/prompts"
+	"github.com/saadjs/skillctl/internal/utils"
 )
 
 func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string, error) {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saadjs/agent-skills/internal/security"
-	"github.com/saadjs/agent-skills/internal/skills"
+	"github.com/saadjs/skillctl/internal/security"
+	"github.com/saadjs/skillctl/internal/skills"
 )
 
 func TestChooseSkillsRequestedByName(t *testing.T) {

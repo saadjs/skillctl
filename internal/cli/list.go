@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/saadjs/agent-skills/internal/skills"
+	"github.com/saadjs/skillctl/internal/skills"
 )
 
 type listOptions struct {

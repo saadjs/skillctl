@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/saadjs/agent-skills/internal/git"
-	"github.com/saadjs/agent-skills/internal/prompts"
-	"github.com/saadjs/agent-skills/internal/security"
-	"github.com/saadjs/agent-skills/internal/skills"
-	"github.com/saadjs/agent-skills/internal/utils"
+	"github.com/saadjs/skillctl/internal/git"
+	"github.com/saadjs/skillctl/internal/prompts"
+	"github.com/saadjs/skillctl/internal/security"
+	"github.com/saadjs/skillctl/internal/skills"
+	"github.com/saadjs/skillctl/internal/utils"
 )
 
 type addOptions struct {
