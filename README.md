@@ -1,8 +1,11 @@
-# agent-skills
+# skillctl
 
-Collection of Agent Skills for various tasks.
+Go CLI for installing, syncing, listing, removing, and validating agent skills.
 
 > If you asked your agent to perform the same task twice, it should probably be a skill.
+
+The personal skills that previously lived in this repository now live in
+[`saadjs/agent-stuff`](https://github.com/saadjs/agent-stuff) under `skills/`.
 
 ## Install (Homebrew)
 
@@ -24,13 +27,13 @@ sudo mv skillctl /usr/local/bin/skillctl
 
 ```sh
 # Install to the new standard ~/.agents/skills directory (recommended)
-skillctl add saadjs/agent-skills --tool agents --scope global
-skillctl add saadjs/agent-skills --tool agents --scope project
+skillctl add saadjs/agent-stuff --tool agents --scope global
+skillctl add saadjs/agent-stuff --tool agents --scope project
 
 # Or install to tool-specific directories
-skillctl add saadjs/agent-skills --tool codex --scope global
-skillctl add saadjs/agent-skills --tool cursor --scope project
-skillctl add saadjs/agent-skills --tool claude --scope project
+skillctl add saadjs/agent-stuff --tool codex --scope global
+skillctl add saadjs/agent-stuff --tool cursor --scope project
+skillctl add saadjs/agent-stuff --tool claude --scope project
 skillctl add ./path/to/skills-repo --dest /tmp/skills
 skillctl add ./path/to/skills-repo --dest /tmp/skills --force
 skillctl list --tool agents --scope global
@@ -83,7 +86,7 @@ skillctl add owner/repo --tool agents --scope global --dry-run --yes --force
 | windsurf | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
 | copilot  | `~/.copilot/skills`          | `.github/skills`   |
 
-## Structure
+## Skill Repo Structure
 
 - `skills/<skill-name>/SKILL.md` defines a skill, its triggers, and workflow.
 

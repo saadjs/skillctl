@@ -4,11 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Go CLI (`skillctl`) plus a collection of markdown-based skills. The CLI installs, syncs, and validates skills under `skills/<name>/SKILL.md`.
+Go CLI (`skillctl`) for installing, syncing, and validating markdown-based skills. The personal skills that previously lived here have moved to `../agent-stuff/skills`.
 
 - `cmd/skillctl/` — CLI entry point
 - `internal/` — cli, config, git, paths, prompts, security, skills, utils
-- `skills/` — shipped skills (each is a directory with `SKILL.md` + YAML frontmatter)
 
 ## Commands
 
