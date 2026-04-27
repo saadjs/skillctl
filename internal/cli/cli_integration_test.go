@@ -41,6 +41,30 @@ func TestAddListRemoveLocalRepo(t *testing.T) {
 	}
 }
 
+func TestCommandAliases(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+
+	destDir := t.TempDir()
+
+	out := runSkillctl(t, "install", repoDir, "--dest", destDir, "--skill", "alpha", "--yes")
+	if !strings.Contains(out, "Installed alpha") {
+		t.Fatalf("expected install alias output, got: %s", out)
+	}
+
+	out = runSkillctl(t, "ls", "--dest", destDir)
+	if strings.TrimSpace(out) != "alpha" {
+		t.Fatalf("expected ls alias output to be alpha, got: %s", out)
+	}
+
+	out = runSkillctl(t, "rm", "--dest", destDir, "--skill", "alpha", "--yes")
+	if !strings.Contains(out, "Removed alpha") {
+		t.Fatalf("expected rm alias output, got: %s", out)
+	}
+}
+
 func TestAddLocalRepoYesInstallsAll(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")
