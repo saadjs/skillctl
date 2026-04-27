@@ -24,6 +24,7 @@ func Execute(args []string) {
 		newListCommand(),
 		newRemoveCommand(),
 		newSyncCommand(),
+		newUpdateCommand(),
 	}
 	if len(args) > 0 {
 		switch args[0] {
