@@ -85,6 +85,32 @@ func TestAddLocalRepoYesInstallsAll(t *testing.T) {
 	}
 }
 
+func TestAddListLocalRepo(t *testing.T) {
+	repoDir := t.TempDir()
+	skillsDir := filepath.Join(repoDir, "skills")
+	mustMkdir(t, skillsDir)
+	mustWrite(t, filepath.Join(skillsDir, "beta", "SKILL.md"), "# beta\n")
+	mustWrite(t, filepath.Join(skillsDir, "alpha", "SKILL.md"), "# alpha\n")
+
+	out := runSkillctl(t, "add", repoDir, "--list")
+	if strings.TrimSpace(out) != "alpha\nbeta" {
+		t.Fatalf("expected sorted list output, got: %s", out)
+	}
+}
+
+func TestAddListLocalRepoCustomPath(t *testing.T) {
+	repoDir := t.TempDir()
+	customSkillsDir := filepath.Join(repoDir, "custom-skills")
+	mustMkdir(t, customSkillsDir)
+	mustWrite(t, filepath.Join(customSkillsDir, "gamma", "SKILL.md"), "# gamma\n")
+	mustWrite(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	out := runSkillctl(t, "add", repoDir, "--path", "custom-skills", "--list")
+	if strings.TrimSpace(out) != "gamma" {
+		t.Fatalf("expected custom path list output, got: %s", out)
+	}
+}
+
 func TestDryRunDoesNotCreateDest(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")

@@ -37,6 +37,7 @@ skillctl add saadjs/agent-stuff --tool cursor --scope project
 skillctl add saadjs/agent-stuff --tool claude --scope project
 skillctl add ./path/to/skills-repo --dest /tmp/skills
 skillctl add ./path/to/skills-repo --dest /tmp/skills --force
+skillctl add saadjs/agent-stuff --list
 skillctl list --tool agents --scope global
 skillctl remove --tool agents --scope project --skill de-dupe
 

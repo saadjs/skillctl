@@ -28,6 +28,7 @@ type addOptions struct {
 	force     bool
 	yes       bool
 	dryRun    bool
+	list      bool
 }
 
 var cloneRepo = git.Clone
@@ -47,6 +48,7 @@ func newAddCommand() *Command {
 	fs.BoolVar(&opts.force, "force", false, "Bypass security findings and continue")
 	fs.BoolVar(&opts.yes, "yes", false, "Non-interactive mode")
 	fs.BoolVar(&opts.dryRun, "dry-run", false, "Print actions without changes")
+	fs.BoolVar(&opts.list, "list", false, "List skills available in source without installing")
 
 	cmd := &Command{
 		Name:        "add",
@@ -58,6 +60,13 @@ func newAddCommand() *Command {
 			if len(args) < 1 {
 				return errors.New("repo or path is required")
 			}
+			source := args[0]
+			if opts.list {
+				if err := validateListOptions(opts); err != nil {
+					return err
+				}
+				return listSourceSkills(source, opts)
+			}
 			if opts.overwrite && opts.skip {
 				return errors.New("--overwrite and --skip cannot be used together")
 			}
@@ -66,7 +75,6 @@ func newAddCommand() *Command {
 				return err
 			}
 
-			source := args[0]
 			repoPath, isLocal, err := utils.ResolveLocalPath(source)
 			if err != nil {
 				return err
@@ -270,6 +278,85 @@ func recordRemoteInstalls(source, ref, skillsPath, dest string, installed []stri
 		}
 	}
 	return config.SaveState(config.StatePath(), st)
+}
+
+func validateListOptions(opts *addOptions) error {
+	if opts.overwrite && opts.skip {
+		return errors.New("--overwrite and --skip cannot be used together")
+	}
+	var unsupported []string
+	if len(opts.tools.values) > 0 {
+		unsupported = append(unsupported, "--tool")
+	}
+	if opts.scope != "" {
+		unsupported = append(unsupported, "--scope")
+	}
+	if opts.dest != "" {
+		unsupported = append(unsupported, "--dest")
+	}
+	if opts.overwrite {
+		unsupported = append(unsupported, "--overwrite")
+	}
+	if opts.skip {
+		unsupported = append(unsupported, "--skip")
+	}
+	if opts.force {
+		unsupported = append(unsupported, "--force")
+	}
+	if opts.dryRun {
+		unsupported = append(unsupported, "--dry-run")
+	}
+	if len(unsupported) > 0 {
+		return fmt.Errorf("%s cannot be used with --list", strings.Join(unsupported, ", "))
+	}
+	return nil
+}
+
+func listSourceSkills(source string, opts *addOptions) error {
+	repoPath, isLocal, err := utils.ResolveLocalPath(source)
+	if err != nil {
+		return err
+	}
+	if isLocal {
+		if opts.ref != "" {
+			return errors.New("--ref is not supported for local paths")
+		}
+	} else {
+		repoURL, err := utils.CloneURL(source)
+		if err != nil {
+			return err
+		}
+		repoPath, err = cloneRepo(repoURL, opts.ref)
+		if err != nil {
+			return err
+		}
+		cleanupCloneDir := filepath.Dir(repoPath)
+		defer func() {
+			_ = os.RemoveAll(cleanupCloneDir)
+		}()
+	}
+
+	skillsDir := filepath.Join(repoPath, opts.path)
+	allSkills, err := skills.Discover(skillsDir)
+	if err != nil {
+		return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
+	}
+	if len(allSkills) == 0 {
+		return fmt.Errorf("no skills found in %s", skillsDir)
+	}
+
+	selected := allSkills
+	if len(opts.skills.values) > 0 {
+		var missing []string
+		selected, missing = skills.Filter(allSkills, opts.skills.values)
+		if len(missing) > 0 {
+			return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
+		}
+	}
+	for _, skill := range selected {
+		fmt.Println(skill.Name)
+	}
+	return nil
 }
 
 func printSecurityScanReport(report security.Report) {
