@@ -59,6 +59,8 @@ func RepoURL(repo string) string {
 	return "https://github.com/" + repo + ".git"
 }
 
+// CloneURL returns the git clone URL for a GitHub repo-like input, preserving
+// SSH input when the user provided git@github.com:owner/repo.
 func CloneURL(input string) (string, error) {
 	repo, err := NormalizeRepo(input)
 	if err != nil {

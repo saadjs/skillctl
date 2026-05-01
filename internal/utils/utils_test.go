@@ -34,6 +34,7 @@ func TestCloneURL(t *testing.T) {
 		"https://github.com/saadjs/skillctl.git": "https://github.com/saadjs/skillctl.git",
 		"git@github.com:saadjs/skillctl":         "git@github.com:saadjs/skillctl.git",
 		"git@github.com:saadjs/skillctl.git":     "git@github.com:saadjs/skillctl.git",
+		"git@github.com:saadjs/skillctl.git/":    "git@github.com:saadjs/skillctl.git",
 	}
 	for input, expected := range cases {
 		got, err := CloneURL(input)
