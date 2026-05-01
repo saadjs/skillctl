@@ -22,7 +22,6 @@ var commandAliases = map[string]string{
 	"install": "add",
 	"ls":      "list",
 	"rm":      "remove",
-	"upgrade": "update",
 }
 
 func Execute(args []string) {
