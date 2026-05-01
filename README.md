@@ -26,6 +26,10 @@ sudo mv skillctl /usr/local/bin/skillctl
 ## Usage
 
 ```sh
+# Show available commands
+skillctl --help
+skillctl --version
+
 # Install to the new standard ~/.agents/skills directory (recommended)
 skillctl add saadjs/agent-stuff --tool agents --scope global
 skillctl add saadjs/agent-stuff --tool agents --scope project
@@ -38,6 +42,7 @@ skillctl add saadjs/agent-stuff --tool claude --scope project
 skillctl add ./path/to/skills-repo --dest /tmp/skills
 skillctl add ./path/to/skills-repo --dest /tmp/skills --force
 skillctl add saadjs/agent-stuff --list
+skillctl add saadjs/agent-stuff --path skills --skill de-dupe --list
 skillctl list --tool agents --scope global
 skillctl remove --tool agents --scope project --skill de-dupe
 
@@ -51,6 +56,18 @@ skillctl sync
 # Force re-sync of every selected skill, even if unchanged
 skillctl sync --all
 ```
+
+Aliases are available for common commands: `skillctl install` is the same as
+`skillctl add`, `skillctl ls` is the same as `skillctl list`, and `skillctl rm`
+is the same as `skillctl remove`.
+
+### Listing Source Skills
+
+Use `skillctl add <repo|path> --list` to print skill names available in a source
+without installing them. `--list` supports source-selection flags such as
+`--ref`, `--path`, and repeatable `--skill`, but it does not accept destination
+or install behavior flags such as `--tool`, `--scope`, `--dest`, `--overwrite`,
+`--skip`, `--force`, or `--dry-run`.
 
 ### Sync mode: `--all`
 
@@ -95,7 +112,10 @@ skillctl add owner/repo --tool agents --scope global --yes
 skillctl add owner/repo --tool agents --scope global --yes --force
 
 # Local dry run still scans, but performs no install writes
-skillctl add owner/repo --tool agents --scope global --dry-run --yes --force
+skillctl add ./path/to/skills-repo --tool agents --scope global --dry-run --yes --force
+
+# Remote dry run skips cloning/scanning and requires explicit skills
+skillctl add owner/repo --tool agents --scope global --dry-run --skill de-dupe
 ```
 
 ### Supported Tools & Paths
@@ -117,4 +137,5 @@ skillctl add owner/repo --tool agents --scope global --dry-run --yes --force
 
 ```sh
 go build ./cmd/skillctl
+make test
 ```
