@@ -138,8 +138,7 @@ func newAddCommand() *Command {
 				if !performScan {
 					utils.PrintInfo("Dry run: remote source was not cloned; security scan skipped.")
 				}
-				for _, destination := range destinations {
-					dest := destination.path
+				for _, dest := range destinations {
 					if _, err := os.Stat(dest); err != nil {
 						if os.IsNotExist(err) {
 							utils.PrintInfo("Dry run: would create destination directory %s", dest)
@@ -168,8 +167,7 @@ func newAddCommand() *Command {
 			if len(selected) == 0 {
 				return errors.New("no skills selected")
 			}
-			for _, destination := range destinations {
-				dest := destination.path
+			for _, dest := range destinations {
 				if err := utils.EnsureDir(dest); err != nil {
 					return err
 				}
@@ -182,11 +180,16 @@ func newAddCommand() *Command {
 					mode = "skip"
 				}
 				for _, skill := range selected {
-					overwrite := mode == "overwrite"
-					skip := mode == "skip"
-					if !overwrite && !skip {
-						if exists(dest, skill.Name) {
-							choice, err := promptConflict(skill.Name)
+					overwrite := false
+					skip := false
+					if exists(dest, skill.Name) {
+						switch mode {
+						case "overwrite":
+							overwrite = true
+						case "skip":
+							skip = true
+						default:
+							choice, err := promptConflict(skill.Name, dest)
 							if err != nil {
 								return err
 							}
@@ -264,7 +267,7 @@ func exists(destRoot, name string) bool {
 	return err == nil
 }
 
-func promptConflict(skillName string) (string, error) {
+func promptConflict(skillName, dest string) (string, error) {
 	options := []string{
 		"overwrite",
 		"skip",
@@ -272,7 +275,7 @@ func promptConflict(skillName string) (string, error) {
 		"skip-all",
 		"cancel",
 	}
-	selection, err := prompts.AskSelect(fmt.Sprintf("Skill %s exists. Choose action", skillName), options)
+	selection, err := prompts.AskSelect(fmt.Sprintf("Skill %s exists in %s. Choose action", skillName, dest), options)
 	if err != nil {
 		return "", err
 	}

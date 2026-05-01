@@ -11,10 +11,6 @@ import (
 	"github.com/saadjs/skillctl/internal/utils"
 )
 
-type addDestination struct {
-	path string
-}
-
 func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string, error) {
 	if destFlag != "" {
 		return expandDest(destFlag)
@@ -81,13 +77,13 @@ func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string,
 	return paths.Resolve(tool, scope, cwd)
 }
 
-func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes bool) ([]addDestination, error) {
+func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes bool) ([]string, error) {
 	if len(toolFlags) == 0 {
 		dest, err := resolveDestination("", scopeFlag, destFlag, yes)
 		if err != nil {
 			return nil, err
 		}
-		return []addDestination{{path: dest}}, nil
+		return []string{dest}, nil
 	}
 	if destFlag != "" {
 		return nil, fmt.Errorf("--dest cannot be combined with --tool")
@@ -116,17 +112,22 @@ func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes 
 	if err != nil {
 		return nil, err
 	}
-	destinations := make([]addDestination, 0, len(toolFlags))
+	seenTools := make(map[paths.Tool]bool, len(toolFlags))
+	destinations := make([]string, 0, len(toolFlags))
 	for _, toolFlag := range toolFlags {
 		tool, err := paths.ParseTool(toolFlag)
 		if err != nil {
 			return nil, err
 		}
+		if seenTools[tool] {
+			continue
+		}
+		seenTools[tool] = true
 		dest, err := paths.Resolve(tool, scope, cwd)
 		if err != nil {
 			return nil, err
 		}
-		destinations = append(destinations, addDestination{path: dest})
+		destinations = append(destinations, dest)
 	}
 	return destinations, nil
 }
