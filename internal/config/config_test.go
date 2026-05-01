@@ -54,6 +54,17 @@ func TestLoadSaveStateRoundTrip(t *testing.T) {
 				},
 			},
 		},
+		RemoteInstalls: map[string]RemoteInstallState{
+			"/tmp/skills::alpha": {
+				Source:      "owner/repo",
+				Ref:         "v1.0.0",
+				Path:        "skills",
+				Skills:      []string{"alpha"},
+				Destination: "/tmp/skills",
+				InstalledAt: "2026-04-13T08:00:00Z",
+				UpdatedAt:   "2026-04-13T09:00:00Z",
+			},
+		},
 	}
 	if err := SaveState(path, want); err != nil {
 		t.Fatalf("SaveState: %v", err)
@@ -88,6 +99,32 @@ func TestLoadSaveStateRoundTrip(t *testing.T) {
 			}
 		}
 	}
+	gotRemote, ok := got.RemoteInstalls["/tmp/skills::alpha"]
+	if !ok {
+		t.Fatal("missing remote install")
+	}
+	wantRemote := want.RemoteInstalls["/tmp/skills::alpha"]
+	if gotRemote.Source != wantRemote.Source {
+		t.Errorf("remote source = %q, want %q", gotRemote.Source, wantRemote.Source)
+	}
+	if gotRemote.Ref != wantRemote.Ref {
+		t.Errorf("remote ref = %q, want %q", gotRemote.Ref, wantRemote.Ref)
+	}
+	if gotRemote.Path != wantRemote.Path {
+		t.Errorf("remote path = %q, want %q", gotRemote.Path, wantRemote.Path)
+	}
+	if gotRemote.Destination != wantRemote.Destination {
+		t.Errorf("remote destination = %q, want %q", gotRemote.Destination, wantRemote.Destination)
+	}
+	if gotRemote.InstalledAt != wantRemote.InstalledAt {
+		t.Errorf("remote installed_at = %q, want %q", gotRemote.InstalledAt, wantRemote.InstalledAt)
+	}
+	if gotRemote.UpdatedAt != wantRemote.UpdatedAt {
+		t.Errorf("remote updated_at = %q, want %q", gotRemote.UpdatedAt, wantRemote.UpdatedAt)
+	}
+	if len(gotRemote.Skills) != 1 || gotRemote.Skills[0] != "alpha" {
+		t.Errorf("remote skills = %v, want [alpha]", gotRemote.Skills)
+	}
 }
 
 func TestLoadStateMissingFile(t *testing.T) {
@@ -100,6 +137,12 @@ func TestLoadStateMissingFile(t *testing.T) {
 	}
 	if len(st.Tools) != 0 {
 		t.Errorf("Tools should be empty, got %d", len(st.Tools))
+	}
+	if st.RemoteInstalls == nil {
+		t.Error("RemoteInstalls map should be initialized, got nil")
+	}
+	if len(st.RemoteInstalls) != 0 {
+		t.Errorf("RemoteInstalls should be empty, got %d", len(st.RemoteInstalls))
 	}
 }
 
