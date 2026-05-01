@@ -98,6 +98,62 @@ func TestUpdateSpecificSkillOnly(t *testing.T) {
 	}
 }
 
+func TestUpdateUsesOriginalRelativeDestination(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	installCWD := t.TempDir()
+	updateCWD := t.TempDir()
+	sourceDir := t.TempDir()
+	relativeDest := "tracked-skills"
+	absoluteDest := filepath.Join(installCWD, relativeDest)
+	mustWrite(t, filepath.Join(sourceDir, "skills", "alpha", "SKILL.md"), "v1\n")
+
+	origClone := cloneRepo
+	defer func() {
+		cloneRepo = origClone
+	}()
+	cloneRepo = fakeCloneRepo(t, sourceDir)
+
+	t.Chdir(installCWD)
+	if err := runAddCommand([]string{
+		"--dest", relativeDest,
+		"--skill", "alpha",
+		"--yes",
+		"owner/repo",
+	}); err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	st, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	entry, ok := st.RemoteInstalls[remoteInstallKey(absoluteDest, "alpha")]
+	if !ok {
+		t.Fatalf("missing absolute remote install entry: %#v", st.RemoteInstalls)
+	}
+	if entry.Destination != absoluteDest {
+		t.Fatalf("Destination = %q, want %q", entry.Destination, absoluteDest)
+	}
+
+	mustWrite(t, filepath.Join(sourceDir, "skills", "alpha", "SKILL.md"), "v2\n")
+	t.Chdir(updateCWD)
+	if err := runUpdate(&updateOptions{yes: true}, nil); err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(absoluteDest, "alpha", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read installed skill: %v", err)
+	}
+	if string(got) != "v2\n" {
+		t.Fatalf("installed content = %q, want v2", string(got))
+	}
+	if _, err := os.Stat(filepath.Join(updateCWD, relativeDest)); err == nil || !os.IsNotExist(err) {
+		t.Fatalf("update should not write relative to later cwd, stat err: %v", err)
+	}
+}
+
 func TestUpdateMissingTrackedSkillErrors(t *testing.T) {
 	cfgDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgDir)
