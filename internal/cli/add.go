@@ -85,6 +85,10 @@ func newAddCommand() *Command {
 				if err != nil {
 					return err
 				}
+				repoURL, err := utils.CloneURL(source)
+				if err != nil {
+					return err
+				}
 				remoteSource = repo
 				if opts.dryRun {
 					performScan = false
@@ -93,7 +97,6 @@ func newAddCommand() *Command {
 					}
 					selectedNames = append(selectedNames, opts.skills.values...)
 				} else {
-					repoURL := utils.RepoURL(repo)
 					repoPath, err = cloneRepo(repoURL, opts.ref)
 					if err != nil {
 						return err

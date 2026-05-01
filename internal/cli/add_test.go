@@ -174,6 +174,47 @@ func TestAddRemoteDryRunRequiresSkill(t *testing.T) {
 	}
 }
 
+func TestAddRemoteSSHURLIsPreservedForClone(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	destDir := filepath.Join(t.TempDir(), "dest")
+	cloneBase := filepath.Join(t.TempDir(), "clone")
+	clonePath := filepath.Join(cloneBase, "repo")
+	if err := os.MkdirAll(filepath.Join(clonePath, "skills", "alpha"), 0o755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(clonePath, "skills", "alpha", "SKILL.md"), []byte("# alpha\n"), 0o644); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	origClone := cloneRepo
+	defer func() {
+		cloneRepo = origClone
+	}()
+
+	var gotRepoURL string
+	cloneRepo = func(repoURL, ref string) (string, error) {
+		gotRepoURL = repoURL
+		return clonePath, nil
+	}
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--dest", destDir,
+		"--skill", "alpha",
+		"--yes",
+		"git@github.com:owner/repo.git",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	if gotRepoURL != "git@github.com:owner/repo.git" {
+		t.Fatalf("expected SSH clone URL, got %s", gotRepoURL)
+	}
+}
+
 func TestAddRepeatableToolInstallsToEachResolvedDestination(t *testing.T) {
 	projectDir := t.TempDir()
 	t.Chdir(projectDir)

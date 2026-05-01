@@ -59,6 +59,20 @@ func RepoURL(repo string) string {
 	return "https://github.com/" + repo + ".git"
 }
 
+// CloneURL returns the git clone URL for a GitHub repo-like input, preserving
+// SSH input when the user provided git@github.com:owner/repo.
+func CloneURL(input string) (string, error) {
+	repo, err := NormalizeRepo(input)
+	if err != nil {
+		return "", err
+	}
+	trimmed := strings.TrimSuffix(strings.TrimSpace(input), "/")
+	if strings.HasPrefix(trimmed, "git@github.com:") {
+		return "git@github.com:" + repo + ".git", nil
+	}
+	return RepoURL(repo), nil
+}
+
 func ResolveLocalPath(input string) (string, bool, error) {
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" {

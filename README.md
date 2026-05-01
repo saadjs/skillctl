@@ -103,7 +103,7 @@ skillctl add owner/repo --tool agents --scope global --dry-run --yes --force
 | -------- | ---------------------------- | ------------------ |
 | agents   | `~/.agents/skills`           | `.agents/skills`   |
 | codex    | `~/.codex/skills`            | `.codex/skills`    |
-| claude   | `~/.claude/skill`            | `.claude/skills`   |
+| claude   | `~/.claude/skills`           | `.claude/skills`   |
 | cursor   | `~/.cursor/skills`           | `.cursor/skills`   |
 | windsurf | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
 | copilot  | `~/.copilot/skills`          | `.github/skills`   |

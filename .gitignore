@@ -1,1 +1,6 @@
 /skillctl
+/bin/
+/build/
+/dist/
+*.test
+coverage.out
