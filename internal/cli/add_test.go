@@ -76,6 +76,184 @@ func TestChooseSkillsPromptSubset(t *testing.T) {
 	}
 }
 
+func TestAddListLocalSourcePrintsSkillsWithoutDestination(t *testing.T) {
+	repoDir := t.TempDir()
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "beta", "SKILL.md"), "# beta\n")
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	origScan := scanRepo
+	defer func() {
+		scanRepo = origScan
+	}()
+	scanRepo = func(root string) (security.Report, error) {
+		return security.Report{}, errors.New("scan should not run in list mode")
+	}
+
+	restoreOutput, output := captureOutput(t)
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"--yes",
+		repoDir,
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	restoreOutput()
+	if strings.TrimSpace(output.String()) != "alpha\nbeta" {
+		t.Fatalf("expected sorted skill names, got: %q", output.String())
+	}
+}
+
+func TestAddListLocalSourceFiltersSkills(t *testing.T) {
+	repoDir := t.TempDir()
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "beta", "SKILL.md"), "# beta\n")
+
+	restoreOutput, output := captureOutput(t)
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"--skill", "alpha",
+		repoDir,
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	restoreOutput()
+	if strings.TrimSpace(output.String()) != "alpha" {
+		t.Fatalf("expected alpha only, got: %q", output.String())
+	}
+}
+
+func TestAddListLocalSourceReportsMissingSkill(t *testing.T) {
+	repoDir := t.TempDir()
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"--skill", "missing",
+		repoDir,
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil || !strings.Contains(err.Error(), "skills not found: missing") {
+		t.Fatalf("expected missing skill error, got: %v", err)
+	}
+}
+
+func TestAddListRejectsOverwriteSkipConflict(t *testing.T) {
+	repoDir := t.TempDir()
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"--overwrite",
+		"--skip",
+		repoDir,
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil || !strings.Contains(err.Error(), "--overwrite and --skip cannot be used together") {
+		t.Fatalf("expected overwrite/skip error, got: %v", err)
+	}
+}
+
+func TestAddListRejectsInstallOnlyFlags(t *testing.T) {
+	repoDir := t.TempDir()
+	mustWriteTestFile(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"--dest", filepath.Join(t.TempDir(), "dest"),
+		"--tool", "codex",
+		"--scope", "project",
+		"--force",
+		"--dry-run",
+		repoDir,
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil {
+		t.Fatal("expected install-only flag error")
+	}
+	for _, flag := range []string{"--dest", "--tool", "--scope", "--force", "--dry-run", "--list"} {
+		if !strings.Contains(err.Error(), flag) {
+			t.Fatalf("expected error to mention %s, got: %v", flag, err)
+		}
+	}
+}
+
+func TestAddListRemoteSourceClonesSkipsScanAndCleansUp(t *testing.T) {
+	cloneBase := filepath.Join(t.TempDir(), "clone")
+	clonePath := filepath.Join(cloneBase, "repo")
+	mustWriteTestFile(t, filepath.Join(clonePath, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	origClone := cloneRepo
+	origScan := scanRepo
+	defer func() {
+		cloneRepo = origClone
+		scanRepo = origScan
+	}()
+
+	cloneCalls := 0
+	cloneRepo = func(repoURL, ref string) (string, error) {
+		cloneCalls++
+		if repoURL != "https://github.com/owner/repo.git" {
+			t.Fatalf("unexpected repo URL: %s", repoURL)
+		}
+		if ref != "main" {
+			t.Fatalf("unexpected ref: %s", ref)
+		}
+		return clonePath, nil
+	}
+	scanRepo = func(root string) (security.Report, error) {
+		return security.Report{}, errors.New("scan should not run in list mode")
+	}
+
+	restoreOutput, output := captureOutput(t)
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"--ref", "main",
+		"owner/repo",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	restoreOutput()
+	if cloneCalls != 1 {
+		t.Fatalf("expected clone called once, got %d", cloneCalls)
+	}
+	if strings.TrimSpace(output.String()) != "alpha" {
+		t.Fatalf("expected alpha, got: %q", output.String())
+	}
+	if _, err := os.Stat(cloneBase); err == nil || !os.IsNotExist(err) {
+		t.Fatalf("expected cloned repo temp dir removed, stat err: %v", err)
+	}
+}
+
 func TestAddRemoteDryRunSkipsCloneAndScan(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "dest")
 
