@@ -18,6 +18,12 @@ type Command struct {
 	AllowNoArgs bool
 }
 
+var commandAliases = map[string]string{
+	"install": "add",
+	"ls":      "list",
+	"rm":      "remove",
+}
+
 func Execute(args []string) {
 	commands := []*Command{
 		newAddCommand(),
@@ -75,6 +81,13 @@ func findCommand(commands []*Command, name string) *Command {
 			return cmd
 		}
 	}
+	if canonical, ok := commandAliases[name]; ok {
+		for _, cmd := range commands {
+			if cmd.Name == canonical {
+				return cmd
+			}
+		}
+	}
 	return nil
 }
 
@@ -86,9 +99,24 @@ func printUsage(commands []*Command) {
 	ordered := append([]*Command{}, commands...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Name < ordered[j].Name })
 	for _, cmd := range ordered {
-		fmt.Fprintf(os.Stderr, "  %-8s %s\n", cmd.Name, cmd.Short)
+		name := cmd.Name
+		if aliases := aliasesForCommand(cmd.Name); len(aliases) > 0 {
+			name = fmt.Sprintf("%s (%s)", cmd.Name, strings.Join(aliases, ", "))
+		}
+		fmt.Fprintf(os.Stderr, "  %-16s %s\n", name, cmd.Short)
 	}
 	fmt.Fprintln(os.Stderr, "\nRun 'skillctl <command> --help' for details.")
+}
+
+func aliasesForCommand(name string) []string {
+	var aliases []string
+	for alias, canonical := range commandAliases {
+		if canonical == name {
+			aliases = append(aliases, alias)
+		}
+	}
+	sort.Strings(aliases)
+	return aliases
 }
 
 func parseWithInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
