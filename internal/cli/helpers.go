@@ -77,6 +77,61 @@ func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string,
 	return paths.Resolve(tool, scope, cwd)
 }
 
+func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes bool) ([]string, error) {
+	if len(toolFlags) == 0 {
+		dest, err := resolveDestination("", scopeFlag, destFlag, yes)
+		if err != nil {
+			return nil, err
+		}
+		return []string{dest}, nil
+	}
+	if destFlag != "" {
+		return nil, fmt.Errorf("--dest cannot be combined with --tool")
+	}
+
+	var scope paths.Scope
+	var err error
+	if scopeFlag != "" {
+		scope, err = paths.ParseScope(scopeFlag)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if scope == "" {
+		if yes {
+			return nil, fmt.Errorf("--yes requires --scope when --tool is used")
+		}
+		selection, err := prompts.AskSelect("Select scope", []string{"global", "project"})
+		if err != nil {
+			return nil, err
+		}
+		scope, _ = paths.ParseScope(selection)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	seenTools := make(map[paths.Tool]bool, len(toolFlags))
+	destinations := make([]string, 0, len(toolFlags))
+	for _, toolFlag := range toolFlags {
+		tool, err := paths.ParseTool(toolFlag)
+		if err != nil {
+			return nil, err
+		}
+		if seenTools[tool] {
+			continue
+		}
+		seenTools[tool] = true
+		dest, err := paths.Resolve(tool, scope, cwd)
+		if err != nil {
+			return nil, err
+		}
+		destinations = append(destinations, dest)
+	}
+	return destinations, nil
+}
+
 func expandDest(dest string) (string, error) {
 	expanded, err := utils.ExpandHome(dest)
 	if err != nil {
