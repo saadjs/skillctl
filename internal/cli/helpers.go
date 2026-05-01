@@ -133,12 +133,12 @@ func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes 
 }
 
 func expandDest(dest string) (string, error) {
-	if strings.HasPrefix(dest, "./") {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(cwd, dest[2:]), nil
+	expanded, err := utils.ExpandHome(dest)
+	if err != nil {
+		return "", err
 	}
-	return utils.ExpandHome(dest)
+	if filepath.IsAbs(expanded) {
+		return expanded, nil
+	}
+	return filepath.Abs(expanded)
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/saadjs/skillctl/internal/config"
 	"github.com/saadjs/skillctl/internal/git"
 	"github.com/saadjs/skillctl/internal/prompts"
 	"github.com/saadjs/skillctl/internal/security"
@@ -73,6 +74,7 @@ func newAddCommand() *Command {
 			performScan := true
 			var selected []skills.Skill
 			var selectedNames []string
+			var remoteSource string
 
 			if isLocal {
 				if opts.ref != "" {
@@ -83,6 +85,7 @@ func newAddCommand() *Command {
 				if err != nil {
 					return err
 				}
+				remoteSource = repo
 				if opts.dryRun {
 					performScan = false
 					if len(opts.skills.values) == 0 {
@@ -179,6 +182,7 @@ func newAddCommand() *Command {
 				if opts.skip {
 					mode = "skip"
 				}
+				var installed []string
 				for _, skill := range selected {
 					overwrite := false
 					skip := false
@@ -221,13 +225,48 @@ func newAddCommand() *Command {
 					if err != nil {
 						return err
 					}
+					installed = append(installed, skill.Name)
 					utils.PrintInfo("Installed %s", skill.Name)
+				}
+				if !isLocal && len(installed) > 0 {
+					if err := recordRemoteInstalls(remoteSource, opts.ref, opts.path, dest, installed); err != nil {
+						return fmt.Errorf("recording remote install state: %w", err)
+					}
 				}
 			}
 			return nil
 		},
 	}
 	return cmd
+}
+
+func recordRemoteInstalls(source, ref, skillsPath, dest string, installed []string) error {
+	st, err := config.LoadState(config.StatePath())
+	if err != nil {
+		return fmt.Errorf("loading state: %w", err)
+	}
+	if st.RemoteInstalls == nil {
+		st.RemoteInstalls = map[string]config.RemoteInstallState{}
+	}
+	now := config.NowTimestamp()
+	for _, name := range installed {
+		key := remoteInstallKey(dest, name)
+		existing := st.RemoteInstalls[key]
+		installedAt := existing.InstalledAt
+		if installedAt == "" {
+			installedAt = now
+		}
+		st.RemoteInstalls[key] = config.RemoteInstallState{
+			Source:      source,
+			Ref:         ref,
+			Path:        skillsPath,
+			Skills:      []string{name},
+			Destination: dest,
+			InstalledAt: installedAt,
+			UpdatedAt:   now,
+		}
+	}
+	return config.SaveState(config.StatePath(), st)
 }
 
 func printSecurityScanReport(report security.Report) {

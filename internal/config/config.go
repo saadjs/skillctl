@@ -23,9 +23,20 @@ type SkillState struct {
 	SyncedAt string `yaml:"synced_at"`
 }
 
+type RemoteInstallState struct {
+	Source      string   `yaml:"source"`
+	Ref         string   `yaml:"ref,omitempty"`
+	Path        string   `yaml:"path"`
+	Skills      []string `yaml:"skills"`
+	Destination string   `yaml:"destination"`
+	InstalledAt string   `yaml:"installed_at"`
+	UpdatedAt   string   `yaml:"updated_at"`
+}
+
 type State struct {
-	LastSync string                           `yaml:"last_sync"`
-	Tools    map[string]map[string]SkillState `yaml:"tools"`
+	LastSync       string                           `yaml:"last_sync"`
+	Tools          map[string]map[string]SkillState `yaml:"tools"`
+	RemoteInstalls map[string]RemoteInstallState    `yaml:"remote_installs,omitempty"`
 }
 
 func Dir() string {
@@ -74,7 +85,10 @@ func LoadState(path string) (*State, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &State{Tools: map[string]map[string]SkillState{}}, nil
+			return &State{
+				Tools:          map[string]map[string]SkillState{},
+				RemoteInstalls: map[string]RemoteInstallState{},
+			}, nil
 		}
 		return nil, err
 	}
@@ -84,6 +98,9 @@ func LoadState(path string) (*State, error) {
 	}
 	if st.Tools == nil {
 		st.Tools = map[string]map[string]SkillState{}
+	}
+	if st.RemoteInstalls == nil {
+		st.RemoteInstalls = map[string]RemoteInstallState{}
 	}
 	return &st, nil
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/saadjs/skillctl/internal/config"
 	"github.com/saadjs/skillctl/internal/security"
 	"github.com/saadjs/skillctl/internal/skills"
 )
@@ -422,6 +423,196 @@ func TestAddRemoteCloneIsCleanedUpOnSecurityBlock(t *testing.T) {
 	}
 	if _, err := os.Stat(cloneBase); err == nil || !os.IsNotExist(err) {
 		t.Fatalf("expected cloned repo temp dir removed, stat err: %v", err)
+	}
+}
+
+func TestAddRemoteRecordsInstallState(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	destDir := filepath.Join(t.TempDir(), "dest")
+	sourceDir := t.TempDir()
+	mustWrite(t, filepath.Join(sourceDir, "skills", "alpha", "SKILL.md"), "v1\n")
+	mustWrite(t, filepath.Join(sourceDir, "skills", "beta", "SKILL.md"), "v1\n")
+
+	origClone := cloneRepo
+	defer func() {
+		cloneRepo = origClone
+	}()
+	cloneRepo = fakeCloneRepo(t, sourceDir)
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--dest", destDir,
+		"--skill", "alpha",
+		"--ref", "main",
+		"--yes",
+		"owner/repo",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	st, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	entry, ok := st.RemoteInstalls[remoteInstallKey(destDir, "alpha")]
+	if !ok {
+		t.Fatalf("missing remote install entry: %#v", st.RemoteInstalls)
+	}
+	if entry.Source != "owner/repo" {
+		t.Errorf("Source = %q, want owner/repo", entry.Source)
+	}
+	if entry.Ref != "main" {
+		t.Errorf("Ref = %q, want main", entry.Ref)
+	}
+	if entry.Path != "skills" {
+		t.Errorf("Path = %q, want skills", entry.Path)
+	}
+	if entry.Destination != destDir {
+		t.Errorf("Destination = %q, want %q", entry.Destination, destDir)
+	}
+	if len(entry.Skills) != 1 || entry.Skills[0] != "alpha" {
+		t.Errorf("Skills = %v, want [alpha]", entry.Skills)
+	}
+	if entry.InstalledAt == "" || entry.UpdatedAt == "" {
+		t.Errorf("expected timestamps, got installed=%q updated=%q", entry.InstalledAt, entry.UpdatedAt)
+	}
+	if _, ok := st.RemoteInstalls[remoteInstallKey(destDir, "beta")]; ok {
+		t.Fatal("beta should not be tracked")
+	}
+}
+
+func TestAddDoesNotTrackDryRunSkippedFailedOrLocalInstalls(t *testing.T) {
+	t.Run("dry-run", func(t *testing.T) {
+		cfgDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", cfgDir)
+		destDir := filepath.Join(t.TempDir(), "dest")
+
+		cmd := newAddCommand()
+		positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+			"--dest", destDir,
+			"--skill", "alpha",
+			"--dry-run",
+			"--yes",
+			"owner/repo",
+		})
+		if err != nil {
+			t.Fatalf("parse failed: %v", err)
+		}
+		if err := cmd.Run(positional); err != nil {
+			t.Fatalf("run failed: %v", err)
+		}
+		assertNoRemoteInstalls(t)
+	})
+
+	t.Run("skipped", func(t *testing.T) {
+		cfgDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", cfgDir)
+		destDir := t.TempDir()
+		sourceDir := t.TempDir()
+		mustWrite(t, filepath.Join(destDir, "alpha", "SKILL.md"), "installed\n")
+		mustWrite(t, filepath.Join(sourceDir, "skills", "alpha", "SKILL.md"), "remote\n")
+
+		origClone := cloneRepo
+		defer func() {
+			cloneRepo = origClone
+		}()
+		cloneRepo = fakeCloneRepo(t, sourceDir)
+
+		cmd := newAddCommand()
+		positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+			"--dest", destDir,
+			"--skill", "alpha",
+			"--skip",
+			"--yes",
+			"owner/repo",
+		})
+		if err != nil {
+			t.Fatalf("parse failed: %v", err)
+		}
+		if err := cmd.Run(positional); err != nil {
+			t.Fatalf("run failed: %v", err)
+		}
+		assertNoRemoteInstalls(t)
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		cfgDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", cfgDir)
+		destDir := t.TempDir()
+		sourceDir := t.TempDir()
+		mustWrite(t, filepath.Join(sourceDir, "skills", "alpha", "SKILL.md"), "remote\n")
+
+		origClone := cloneRepo
+		origScan := scanRepo
+		defer func() {
+			cloneRepo = origClone
+			scanRepo = origScan
+		}()
+		cloneRepo = fakeCloneRepo(t, sourceDir)
+		scanRepo = func(root string) (security.Report, error) {
+			return security.Report{Findings: []security.Finding{{
+				RuleID:   "test_rule",
+				Severity: security.SeverityHigh,
+				Path:     "SKILL.md",
+				Line:     1,
+				Message:  "blocked",
+			}}}, nil
+		}
+
+		cmd := newAddCommand()
+		positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+			"--dest", destDir,
+			"--skill", "alpha",
+			"--yes",
+			"owner/repo",
+		})
+		if err != nil {
+			t.Fatalf("parse failed: %v", err)
+		}
+		err = cmd.Run(positional)
+		if err == nil {
+			t.Fatal("expected add to fail")
+		}
+		assertNoRemoteInstalls(t)
+	})
+
+	t.Run("local", func(t *testing.T) {
+		cfgDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", cfgDir)
+		destDir := t.TempDir()
+		sourceDir := t.TempDir()
+		mustWrite(t, filepath.Join(sourceDir, "skills", "alpha", "SKILL.md"), "local\n")
+
+		cmd := newAddCommand()
+		positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+			"--dest", destDir,
+			"--skill", "alpha",
+			"--yes",
+			sourceDir,
+		})
+		if err != nil {
+			t.Fatalf("parse failed: %v", err)
+		}
+		if err := cmd.Run(positional); err != nil {
+			t.Fatalf("run failed: %v", err)
+		}
+		assertNoRemoteInstalls(t)
+	})
+}
+
+func assertNoRemoteInstalls(t *testing.T) {
+	t.Helper()
+	st, err := config.LoadState(config.StatePath())
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if len(st.RemoteInstalls) != 0 {
+		t.Fatalf("expected no remote installs, got %#v", st.RemoteInstalls)
 	}
 }
 

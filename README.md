@@ -40,6 +40,10 @@ skillctl add ./path/to/skills-repo --dest /tmp/skills --force
 skillctl list --tool agents --scope global
 skillctl remove --tool agents --scope project --skill de-dupe
 
+# Update remote installs from their original source
+skillctl update
+skillctl update de-dupe
+
 # Sync changed skills only (default)
 skillctl sync
 
@@ -52,6 +56,23 @@ skillctl sync --all
 `skillctl sync` is checksum-aware by default: it only copies skills that changed since the last sync for each configured tool.
 
 Use `skillctl sync --all` when you need a full refresh. It ignores stored checksums and re-copies every selected skill, which helps when local skill folders were manually edited, partially deleted, or drifted out of sync without source changes.
+
+### Remote Updates
+
+Remote installs are tracked in `~/.config/skillctl/state.yaml`. When you install from a GitHub repo, `skillctl` records the source, ref, skills path, selected skill names, and destination so they can be reinstalled later.
+
+```sh
+# Update every tracked remote install
+skillctl update
+
+# Update only selected tracked skills
+skillctl update de-dupe readme-maintainer
+
+# Preview updates without writing files or state
+skillctl update --dry-run
+```
+
+Local path installs and sync operations are not tracked for `skillctl update`.
 
 ### Security Scan During Install
 
