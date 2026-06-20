@@ -47,22 +47,7 @@ func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string,
 			if err != nil {
 				return "", err
 			}
-			options := []string{}
-			toolMap := make(map[string]paths.Tool)
-			for _, t := range paths.Tools() {
-				resolved, err := paths.Resolve(t, scope, cwd)
-				if err != nil {
-					continue
-				}
-				// Shorten home directory to ~ for display
-				display := resolved
-				if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(resolved, home) {
-					display = "~" + resolved[len(home):]
-				}
-				option := fmt.Sprintf("%s (%s)", t, display)
-				options = append(options, option)
-				toolMap[option] = t
-			}
+			options, toolMap := toolPromptOptions(scope, cwd)
 			selection, err := prompts.AskSelect("Select tool", options)
 			if err != nil {
 				return "", err
@@ -79,11 +64,16 @@ func resolveDestination(toolFlag, scopeFlag, destFlag string, yes bool) (string,
 
 func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes bool) ([]string, error) {
 	if len(toolFlags) == 0 {
-		dest, err := resolveDestination("", scopeFlag, destFlag, yes)
-		if err != nil {
-			return nil, err
+		if destFlag != "" {
+			dest, err := expandDest(destFlag)
+			if err != nil {
+				return nil, err
+			}
+			return []string{dest}, nil
 		}
-		return []string{dest}, nil
+		if yes {
+			return nil, fmt.Errorf("--yes requires --tool and --scope or --dest")
+		}
 	}
 	if destFlag != "" {
 		return nil, fmt.Errorf("--dest cannot be combined with --tool")
@@ -112,6 +102,17 @@ func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes 
 	if err != nil {
 		return nil, err
 	}
+	if len(toolFlags) == 0 {
+		options, toolMap := toolPromptOptions(scope, cwd)
+		selections, err := prompts.AskMulti("Select tools", options)
+		if err != nil {
+			return nil, err
+		}
+		toolFlags = make([]string, 0, len(selections))
+		for _, selection := range selections {
+			toolFlags = append(toolFlags, string(toolMap[selection]))
+		}
+	}
 	seenTools := make(map[paths.Tool]bool, len(toolFlags))
 	destinations := make([]string, 0, len(toolFlags))
 	for _, toolFlag := range toolFlags {
@@ -130,6 +131,26 @@ func resolveAddDestinations(toolFlags []string, scopeFlag, destFlag string, yes 
 		destinations = append(destinations, dest)
 	}
 	return destinations, nil
+}
+
+func toolPromptOptions(scope paths.Scope, cwd string) ([]string, map[string]paths.Tool) {
+	options := []string{}
+	toolMap := make(map[string]paths.Tool)
+	for _, tool := range paths.Tools() {
+		resolved, err := paths.Resolve(tool, scope, cwd)
+		if err != nil {
+			continue
+		}
+		// Shorten home directory to ~ for display.
+		display := resolved
+		if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(resolved, home) {
+			display = "~" + resolved[len(home):]
+		}
+		option := fmt.Sprintf("%s (%s)", tool, display)
+		options = append(options, option)
+		toolMap[option] = tool
+	}
+	return options, toolMap
 }
 
 func expandDest(dest string) (string, error) {

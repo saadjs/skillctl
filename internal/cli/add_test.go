@@ -254,6 +254,38 @@ func TestAddListRemoteSourceClonesSkipsScanAndCleansUp(t *testing.T) {
 	}
 }
 
+func TestAddListRemoteSourceErrorUsesRepositoryLocation(t *testing.T) {
+	cloneBase := filepath.Join(t.TempDir(), "clone")
+	clonePath := filepath.Join(cloneBase, "repo")
+	mustWriteTestFile(t, filepath.Join(clonePath, "skills", "engineering", "alpha", "SKILL.md"), "# alpha\n")
+
+	origClone := cloneRepo
+	defer func() { cloneRepo = origClone }()
+	cloneRepo = func(repoURL, ref string) (string, error) {
+		return clonePath, nil
+	}
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		"--list",
+		"https://github.com/owner/repo.git",
+	})
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	err = cmd.Run(positional)
+	if err == nil {
+		t.Fatal("expected no skills error")
+	}
+	want := "no skills found in owner/repo at skills"
+	if err.Error() != want {
+		t.Fatalf("expected %q, got %q", want, err)
+	}
+	if strings.Contains(err.Error(), clonePath) {
+		t.Fatalf("expected error not to expose temporary clone path: %v", err)
+	}
+}
+
 func TestAddRemoteDryRunSkipsCloneAndScan(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "dest")
 
@@ -428,6 +460,63 @@ func TestAddRepeatableToolInstallsToEachResolvedDestination(t *testing.T) {
 	}
 }
 
+func TestAddInteractiveToolSelectionInstallsToEachDestination(t *testing.T) {
+	projectDir := t.TempDir()
+	t.Chdir(projectDir)
+
+	repoDir := t.TempDir()
+	mustWrite(t, filepath.Join(repoDir, "skills", "alpha", "SKILL.md"), "# alpha\n")
+
+	restoreInput := withStdin(t, "2,3\n")
+	defer restoreInput()
+	restoreOutput, output := captureOutput(t)
+
+	cmd := newAddCommand()
+	positional, err := parseWithInterspersed(cmd.FlagSet, []string{
+		repoDir,
+		"--scope", "project",
+		"--skill", "alpha",
+	})
+	if err != nil {
+		restoreOutput()
+		t.Fatalf("parse failed: %v", err)
+	}
+	if err := cmd.Run(positional); err != nil {
+		restoreOutput()
+		t.Fatalf("run failed: %v", err)
+	}
+	restoreOutput()
+
+	if !strings.Contains(output.String(), "Select one or more numbers") {
+		t.Fatalf("expected multi-tool prompt, got: %s", output.String())
+	}
+	for _, dest := range []string{
+		filepath.Join(projectDir, ".codex", "skills", "alpha", "SKILL.md"),
+		filepath.Join(projectDir, ".claude", "skills", "alpha", "SKILL.md"),
+	} {
+		if _, err := os.Stat(dest); err != nil {
+			t.Fatalf("expected skill installed at %s: %v", dest, err)
+		}
+	}
+}
+
+func TestResolveAddDestinationsInteractiveAcceptsSingleTool(t *testing.T) {
+	projectDir := t.TempDir()
+	t.Chdir(projectDir)
+
+	restoreInput := withStdin(t, "2\n")
+	defer restoreInput()
+
+	destinations, err := resolveAddDestinations(nil, "project", "", false)
+	if err != nil {
+		t.Fatalf("resolve failed: %v", err)
+	}
+	want := filepath.Join(projectDir, ".codex", "skills")
+	if len(destinations) != 1 || destinations[0] != want {
+		t.Fatalf("expected single destination %s, got: %v", want, destinations)
+	}
+}
+
 func TestAddRejectsDestWithTool(t *testing.T) {
 	repoDir := t.TempDir()
 	skillsDir := filepath.Join(repoDir, "skills")
@@ -599,9 +688,7 @@ func TestAddRemoteCloneIsCleanedUpOnSecurityBlock(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "dest")
 	cloneBase := filepath.Join(t.TempDir(), "clone")
 	clonePath := filepath.Join(cloneBase, "repo")
-	if err := os.MkdirAll(clonePath, 0o755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
-	}
+	mustWrite(t, filepath.Join(clonePath, "skills", "alpha", "SKILL.md"), "# alpha\n")
 
 	origClone := cloneRepo
 	origScan := scanRepo
@@ -619,7 +706,7 @@ func TestAddRemoteCloneIsCleanedUpOnSecurityBlock(t *testing.T) {
 				{
 					RuleID:   "test_rule",
 					Severity: security.SeverityHigh,
-					Path:     "skills/alpha/SKILL.md",
+					Path:     "SKILL.md",
 					Line:     1,
 					Message:  "test finding",
 				},
