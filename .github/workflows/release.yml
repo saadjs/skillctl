@@ -128,7 +128,7 @@ jobs:
             end
 
             test do
-              assert_match "skillctl", shell_output("#{bin}/skillctl --help")
+              assert_match "skillctl", shell_output("#{{bin}}/skillctl --help")
             end
           end
           '''
