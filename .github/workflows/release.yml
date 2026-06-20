@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p dist
           VERSION_CLEAN=${VERSION#v}
-          go build -ldflags "-X github.com/saadjs/agent-skills/internal/cli.Version=${VERSION_CLEAN}" -o dist/skillctl ./cmd/skillctl
+          go build -ldflags "-X github.com/saadjs/skillctl/internal/cli.Version=${VERSION_CLEAN}" -o dist/skillctl ./cmd/skillctl
 
       - name: Package
         env:
@@ -81,7 +81,7 @@ jobs:
 
           version = os.environ["VERSION"]
           token = os.environ["GH_TOKEN"]
-          api = f"https://api.github.com/repos/saadjs/agent-skills/releases/tags/{version}"
+          api = f"https://api.github.com/repos/saadjs/skillctl/releases/tags/{version}"
           req = urllib.request.Request(api, headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
           with urllib.request.urlopen(req) as resp:
               data = json.load(resp)
@@ -105,21 +105,21 @@ jobs:
 
           formula = f'''class Skillctl < Formula
             desc "Install and manage agent skills"
-            homepage "https://github.com/saadjs/agent-skills"
+            homepage "https://github.com/saadjs/skillctl"
             version "{vclean}"
 
             on_macos do
               if Hardware::CPU.arm?
-                url "https://github.com/saadjs/agent-skills/releases/download/v{vclean}/skillctl_{vclean}_darwin_arm64.tar.gz"
+                url "https://github.com/saadjs/skillctl/releases/download/v{vclean}/skillctl_{vclean}_darwin_arm64.tar.gz"
                 sha256 "{sha_darwin_arm64}"
               else
-                url "https://github.com/saadjs/agent-skills/releases/download/v{vclean}/skillctl_{vclean}_darwin_amd64.tar.gz"
+                url "https://github.com/saadjs/skillctl/releases/download/v{vclean}/skillctl_{vclean}_darwin_amd64.tar.gz"
                 sha256 "{sha_darwin_amd64}"
               end
             end
 
             on_linux do
-              url "https://github.com/saadjs/agent-skills/releases/download/v{vclean}/skillctl_{vclean}_linux_amd64.tar.gz"
+              url "https://github.com/saadjs/skillctl/releases/download/v{vclean}/skillctl_{vclean}_linux_amd64.tar.gz"
               sha256 "{sha_linux}"
             end
 
