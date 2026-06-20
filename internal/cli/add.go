@@ -121,7 +121,22 @@ func newAddCommand() *Command {
 
 			if performScan {
 				skillsDir := filepath.Join(repoPath, opts.path)
-				securityReport, err := scanRepo(skillsDir)
+				skillsLocation := displaySkillsLocation(source, repoPath, opts.path, isLocal)
+				allSkills, err := skills.Discover(skillsDir)
+				if err != nil {
+					return fmt.Errorf("unable to read skills from %s: %w", skillsLocation, err)
+				}
+				missing := []string(nil)
+				selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
+				if len(missing) > 0 {
+					return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
+				}
+				if len(selected) == 0 {
+					return fmt.Errorf("no skills found in %s", skillsLocation)
+				}
+				selectedNames = skillNames(selected)
+
+				securityReport, err := scanSelectedSkills(selected)
 				if err != nil {
 					return fmt.Errorf("security scan failed: %w", err)
 				}
@@ -132,20 +147,6 @@ func newAddCommand() *Command {
 				if err := enforceSecurityDecision(securityReport, opts.force, opts.yes); err != nil {
 					return err
 				}
-
-				allSkills, err := skills.Discover(skillsDir)
-				if err != nil {
-					return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
-				}
-				missing := []string(nil)
-				selected, missing = chooseSkills(allSkills, opts.skills.values, opts.yes)
-				if len(missing) > 0 {
-					return fmt.Errorf("skills not found: %s", strings.Join(missing, ", "))
-				}
-				if len(selected) == 0 {
-					return fmt.Errorf("no skills found in %s", skillsDir)
-				}
-				selectedNames = skillNames(selected)
 			}
 
 			if opts.dryRun {
@@ -337,12 +338,13 @@ func listSourceSkills(source string, opts *addOptions) error {
 	}
 
 	skillsDir := filepath.Join(repoPath, opts.path)
+	skillsLocation := displaySkillsLocation(source, repoPath, opts.path, isLocal)
 	allSkills, err := skills.Discover(skillsDir)
 	if err != nil {
-		return fmt.Errorf("unable to read skills at %s: %w", skillsDir, err)
+		return fmt.Errorf("unable to read skills from %s: %w", skillsLocation, err)
 	}
 	if len(allSkills) == 0 {
-		return fmt.Errorf("no skills found in %s", skillsDir)
+		return fmt.Errorf("no skills found in %s", skillsLocation)
 	}
 
 	selected := allSkills
@@ -357,6 +359,16 @@ func listSourceSkills(source string, opts *addOptions) error {
 		fmt.Println(skill.Name)
 	}
 	return nil
+}
+
+func displaySkillsLocation(source, repoPath, skillsPath string, isLocal bool) string {
+	if isLocal {
+		return filepath.Join(repoPath, skillsPath)
+	}
+	if normalized, err := utils.NormalizeRepo(source); err == nil {
+		source = normalized
+	}
+	return fmt.Sprintf("%s at %s", source, filepath.ToSlash(filepath.Clean(skillsPath)))
 }
 
 func printSecurityScanReport(report security.Report) {

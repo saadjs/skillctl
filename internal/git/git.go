@@ -13,7 +13,7 @@ func Clone(repoURL, ref string) (string, error) {
 		return "", err
 	}
 	target := filepath.Join(base, "repo")
-	args := []string{"clone", "--depth", "1"}
+	args := []string{"clone", "--quiet", "--depth", "1"}
 	if ref != "" {
 		args = append(args, "--branch", ref, "--single-branch")
 	}
